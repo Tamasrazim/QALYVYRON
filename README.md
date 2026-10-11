@@ -4,14 +4,14 @@
 
 QALYVYRON is being developed as a local desktop tool for creating, editing, animating, and rendering 3D work without requiring Blender, a paid subscription, or a cloud account. The goal is not to imitate Blender's interface; it is to provide a workflow that is easier to discover, mouse-friendly by default, and capable of finishing real projects.
 
-**Status: active prototype — not yet a drop-in Blender replacement.** QALYVYRON now has an initial editable mesh kernel and a usable geometry-only OBJ import/export path, but it still lacks full mouse-driven Edit Mode, a production final renderer, a complete animation system, UV/texture workflows, and production packaging. Those gaps remain explicit work items.
+**Status: active mainline development build — not yet a finished Blender replacement.** QALYVYRON now has an initial editable mesh kernel and a usable geometry-only OBJ import/export path, but it still lacks full mouse-driven Edit Mode, a production final renderer, a complete animation system, UV/texture workflows, and production packaging. Those gaps remain explicit work items.
 
-## Current prototype capabilities
+## Implemented in the main build
 
 - Interactive 3D viewport with orbit, zoom, selection, and a reference grid.
 - Cube, sphere, cylinder, cone, and plane scene objects.
 - Object hierarchy, renaming, duplication, deletion, and direct transform editing.
-- Editable polygon-mesh tools for built-in primitives and imported OBJ geometry: click vertex/face markers in the viewport, change vertex coordinates, extrude and inset convex planar faces, and delete faces.
+- Editable polygon-mesh tools for built-in primitives and imported OBJ geometry: create faces from ordered viewport vertex selections, merge vertices, change vertex coordinates, extrude and inset convex planar faces, and delete faces.
 - Material base-color palette and roughness for the built-in primitive objects.
 - Camera field-of-view and key/fill-light controls.
 - Versioned `.qvscene` project files with local save/open validation, including the editable mesh topology.
@@ -25,7 +25,7 @@ The first OBJ path is geometry-only: it currently reads `v` and `f` data, not OB
 
 ## What must be built before it can replace Blender for daily work
 
-The major remaining systems are full mouse-driven vertex/edge/face selection, bevel/inset/merge/loop tools, robust topology operations, UV and texture workflows, node-based materials, a production-quality offline renderer, animation and timeline tools, render queues, broader asset interoperability, and a complete tested Windows installer. The acceptance criteria live in [ROADMAP.md](ROADMAP.md).
+The major remaining systems are robust vertex/edge/face selection and edge modeling, bevel/loop tools, non-destructive modifiers, UV and texture workflows, node-based materials, a production-quality offline renderer, animation and timeline tools, render queues, broader asset interoperability, and a complete tested Windows installer. The acceptance criteria live in [ROADMAP.md](ROADMAP.md).
 
 The rule for the project is simple: **a control is not considered implemented just because it appears in the interface.** It must perform the advertised work and be tested. Builds and file-format limits should be documented honestly.
 
