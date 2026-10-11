@@ -67,13 +67,6 @@ QVector3D componentMultiply(const QVector3D &a, const QVector3D &b)
     return QVector3D(a.x() * b.x(), a.y() * b.y(), a.z() * b.z());
 }
 
-QVector3D maxComponents(const QVector3D &value, float minimum)
-{
-    return QVector3D(std::max(value.x(), minimum),
-                     std::max(value.y(), minimum),
-                     std::max(value.z(), minimum));
-}
-
 float largestAxis(const QVector3D &extent)
 {
     return std::max({extent.x(), extent.y(), extent.z()});
@@ -569,7 +562,6 @@ QVector3D directLighting(const Ray &ray,
         applyLight(direction, 0.80f * attenuation, distance - kRayEpsilon);
     }
 
-    Q_UNUSED(maxComponents);
     return radiance;
 }
 
