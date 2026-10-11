@@ -748,11 +748,13 @@ ApplicationWindow {
 
             geometry: EditableGeometry {
                 id: editableGeometry
-                shape: editableModel.editorShape
                 Component.onCompleted: {
+                    // Set a correct base shape first, then restore custom topology if present.
+                    setShape(editableModel.editorShape)
                     const savedMesh = editableModel.editorMeshData
                     if (savedMesh && Object.keys(savedMesh).length > 0
                             && !loadMesh(savedMesh)) {
+                        setShape(editableModel.editorShape)
                         root.setStatus("Saved mesh data was invalid; the base primitive was loaded.")
                     }
                 }
