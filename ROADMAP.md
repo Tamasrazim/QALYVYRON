@@ -49,12 +49,13 @@ This stage is what separates a scene viewer from a practical 3D creation tool.
 
 ## Stage 4 — Production materials, lighting, and final rendering
 
-- [ ] Add a principled PBR material editor with editable roughness, metallic, alpha, normal, and texture inputs.
+- [x] Add a separate CPU offline still renderer using scene triangles, BVH acceleration, camera sampling, base color/roughness, directional and point lights, hard shadows, PNG output, cancellation, and progress.
+- [x] Add configurable diffuse indirect bounces and a bounded resolution/sample/bounce workload.
+- [ ] Add a principled PBR material editor with metallic, alpha, normal, and texture inputs.
 - [ ] Add UV coordinates and a practical UV editing workflow.
-- [ ] Support camera composition, multiple light types, shadows, and environment lighting.
-- [ ] Design and integrate a dedicated final-render backend; do not present viewport screenshots as final renders.
-- [ ] Add sampling, render resolution, denoising, output format, progress, cancellation, and recovery.
-- [ ] Add repeatable render tests for geometry, materials, lighting, color handling, and image output.
+- [ ] Add environment and area lights, soft shadows, and a denoiser.
+- [ ] Add renderer support for imported asset geometry and portable asset dependencies.
+- [ ] Add repeatable render tests for geometry, materials, lighting, bounce behavior, color handling, cancellation, and image output.
 
 **Acceptance:** render a saved scene at a user-selected resolution to a real output image, with reproducible settings and error messages for unsupported hardware or failed renders.
 
