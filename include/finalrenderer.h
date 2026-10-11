@@ -27,7 +27,8 @@ public:
                                  const QVariantMap &scene,
                                  int width,
                                  int height,
-                                 int samplesPerPixel);
+                                 int samplesPerPixel,
+                                 int maxDiffuseBounces);
     Q_INVOKABLE void cancelRender();
 
 signals:
@@ -48,7 +49,8 @@ private:
                    QVariantMap scene,
                    int width,
                    int height,
-                   int samplesPerPixel);
+                   int samplesPerPixel,
+                   int maxDiffuseBounces);
     void setWorkerProgress(double value);
     void setWorkerStatus(const QString &value);
 };
