@@ -27,7 +27,9 @@ qt_standard_project_setup(REQUIRES 6.4)
 qt_add_executable(QALYVYRON
     src/main.cpp
     src/projectio.cpp
+    src/finalrenderer.cpp
     include/projectio.h
+    include/finalrenderer.h
 )
 
 target_include_directories(QALYVYRON PRIVATE include)
@@ -86,4 +88,17 @@ if(BUILD_TESTING)
         Qt6::Test
     )
     add_test(NAME EditableGeometryTests COMMAND qalyvyron_geometry_tests)
+
+    qt_add_executable(qalyvyron_finalrenderer_tests
+        tests/test_finalrenderer.cpp
+        src/finalrenderer.cpp
+        include/finalrenderer.h
+    )
+    target_include_directories(qalyvyron_finalrenderer_tests PRIVATE include)
+    target_link_libraries(qalyvyron_finalrenderer_tests PRIVATE
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Test
+    )
+    add_test(NAME FinalRendererTests COMMAND qalyvyron_finalrenderer_tests)
 endif()
