@@ -4,7 +4,7 @@ The target is a **usable, independent desktop alternative to Blender for everyda
 
 ## Current state
 
-QALYVYRON is an early prototype. It already has a Qt Quick 3D viewport, primitive scene objects, basic object transforms, a hierarchy, primitive material controls, camera/light settings, versioned scene files and viewport-preview export. Bounded undo/redo and local OBJ/glTF import have now been added to the implementation, but they still need a green build and runtime smoke tests before being treated as validated features.
+QALYVYRON is an early prototype. It now has a Qt Quick 3D viewport, primitive scene objects, object transforms, a hierarchy, primitive material controls, camera/light settings, versioned scene files and viewport-preview export. The editable mesh kernel supports indexed vertex changes, convex planar face extrusion/inset, local geometry-only OBJ import, and OBJ export with transforms baked. Runtime-loaded GLB/glTF remains read-only. These new pathways still need a green build and runtime smoke tests before being treated as validated features.
 
 ## Stage 1 — Dependable scene workspace
 
@@ -28,7 +28,8 @@ This stage is what separates a scene viewer from a practical 3D creation tool.
 
 - [ ] Implement a persistent mesh data model with vertices, edges, faces, normals, and topology validation.
 - [ ] Add object mode and mesh-edit mode with visible vertex, edge, and face selection.
-- [ ] Implement move, rotate, scale, extrude, inset, bevel, merge, delete, and face creation.
+- [x] Implement an initial vertex-coordinate editor, face extrusion, and convex planar face inset for supported mesh topology.
+- [ ] Implement interactive vertex/edge/face selection, edge operations, bevel, merge, delete, face creation, and non-destructive mesh operations.
 - [ ] Add snapping, pivot modes, transform gizmos, numeric operations, and reliable selection.
 - [ ] Add subdivision and non-destructive modifier stacks with editable parameters.
 - [ ] Make mesh operations undoable and test them against invalid or degenerate geometry.
