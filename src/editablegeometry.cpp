@@ -409,6 +409,99 @@ bool EditableGeometry::deleteFace(int faceIndex)
     return true;
 }
 
+bool EditableGeometry::mergeVertices(int sourceIndex, int targetIndex)
+{
+    if (sourceIndex < 0 || sourceIndex >= m_vertices.size()
+        || targetIndex < 0 || targetIndex >= m_vertices.size()
+        || sourceIndex == targetIndex) {
+        return false;
+    }
+
+    QVector<QVector3D> candidateVertices = m_vertices;
+    candidateVertices[sourceIndex] = candidateVertices.at(targetIndex);
+
+    QVector<QVector<int>> candidateFaces;
+    candidateFaces.reserve(m_faces.size());
+    for (const QVector<int> &originalFace : m_faces) {
+        QVector<int> face;
+        face.reserve(originalFace.size());
+
+        for (const int originalIndex : originalFace) {
+            if (originalIndex < 0 || originalIndex >= candidateVertices.size())
+                return false;
+
+            const int index = originalIndex == sourceIndex ? targetIndex : originalIndex;
+            if (face.isEmpty() || face.last() != index)
+                face.append(index);
+        }
+
+        // A closing duplicate is also a zero-length edge after the merge.
+        if (face.size() > 1 && face.first() == face.last())
+            face.removeLast();
+
+        if (face.size() < 3)
+            continue;
+
+        QSet<int> uniqueIndices;
+        for (const int index : face)
+            uniqueIndices.insert(index);
+        // Non-consecutive repeated indices would make the polygon self-touch.
+        // Drop that face rather than retaining invalid topology.
+        if (uniqueIndices.size() != face.size())
+            continue;
+
+        QVector3D normal;
+        for (int i = 0; i < face.size(); ++i) {
+            const QVector3D &a = candidateVertices.at(face.at(i));
+            const QVector3D &b = candidateVertices.at(face.at((i + 1) % face.size()));
+            normal.setX(normal.x() + (a.y() - b.y()) * (a.z() + b.z()));
+            normal.setY(normal.y() + (a.z() - b.z()) * (a.x() + b.x()));
+            normal.setZ(normal.z() + (a.x() - b.x()) * (a.y() + b.y()));
+        }
+        if (!finiteVector(normal) || normal.lengthSquared() < kEpsilon * kEpsilon)
+            continue;
+
+        candidateFaces.append(face);
+    }
+
+    // Refuse a merge that destroys the complete surface.
+    if (candidateFaces.isEmpty())
+        return false;
+
+    QVector<bool> used(candidateVertices.size(), false);
+    for (const QVector<int> &face : candidateFaces) {
+        for (const int index : face)
+            used[index] = true;
+    }
+
+    QVector<int> remap(candidateVertices.size(), -1);
+    QVector<QVector3D> compactVertices;
+    compactVertices.reserve(candidateVertices.size());
+    for (int oldIndex = 0; oldIndex < candidateVertices.size(); ++oldIndex) {
+        if (!used.at(oldIndex))
+            continue;
+        remap[oldIndex] = compactVertices.size();
+        compactVertices.append(candidateVertices.at(oldIndex));
+    }
+
+    for (QVector<int> &face : candidateFaces) {
+        for (int &index : face) {
+            index = remap.at(index);
+            if (index < 0)
+                return false;
+        }
+    }
+
+    if (compactVertices.size() < 3 || candidateFaces.isEmpty())
+        return false;
+
+    m_vertices = compactVertices;
+    m_faces = candidateFaces;
+    rebuildGeometry();
+    emit meshChanged();
+    return true;
+}
+
 QVariantMap EditableGeometry::serializeMesh() const
 {
     QVariantList vertices;
