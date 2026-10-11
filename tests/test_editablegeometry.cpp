@@ -2,6 +2,8 @@
 
 #include <QtTest>
 
+#include <limits>
+
 class EditableGeometryTests final : public QObject
 {
     Q_OBJECT
