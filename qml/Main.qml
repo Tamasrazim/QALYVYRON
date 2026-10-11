@@ -854,7 +854,10 @@ ApplicationWindow {
     Dialog {
         id: meshEditDialog
         title: "Edit Mesh"
-        modal: true
+        // Keep the editor palette non-modal so vertex/face handles behind
+        // it remain clickable in the 3D viewport.
+        modal: false
+        dim: false
         focus: true
         width: 560
         height: 540
@@ -1613,6 +1616,10 @@ ApplicationWindow {
                                 readonly property var projectedPosition: {
                                     if (!root.selectedObject || !root.selectedEditableGeometry())
                                         return Qt.vector3d(-1000, -1000, -1)
+                                    // Reading a NOTIFY-backed property makes this projected
+                                    // handle refresh after coordinates change, even if the count
+                                    // of vertices remains the same.
+                                    const meshChangeTrigger = root.selectedObject.geometry.vertexCount
                                     const local = root.selectedObject.geometry.vertexPosition(index)
                                     const scene = root.selectedObject.mapPositionToScene(local)
                                     return view3d.mapFrom3DScene(scene)
@@ -1654,6 +1661,7 @@ ApplicationWindow {
                                 readonly property var projectedPosition: {
                                     if (!root.selectedObject || !root.selectedEditableGeometry())
                                         return Qt.vector3d(-1000, -1000, -1)
+                                    const meshChangeTrigger = root.selectedObject.geometry.faceCount
                                     const local = root.selectedObject.geometry.faceCenter(index)
                                     const scene = root.selectedObject.mapPositionToScene(local)
                                     return view3d.mapFrom3DScene(scene)
