@@ -720,18 +720,14 @@ ApplicationWindow {
                                     position: Qt.vector3d(0, 0, 0)
                                 }
 
-                                Model {
-                                    source: "#Rectangle"
+                                AxisHelper {
                                     position: Qt.vector3d(0, -65, 0)
-                                    eulerRotation: Qt.vector3d(-90, 0, 0)
-                                    scale: Qt.vector3d(12, 12, 12)
-                                    pickable: false
-                                    materials: [
-                                        PrincipledMaterial {
-                                            baseColor: "#202020"
-                                            roughness: 1.0
-                                        }
-                                    ]
+                                    enableAxisLines: true
+                                    enableXZGrid: true
+                                    enableXYGrid: false
+                                    enableYZGrid: false
+                                    gridColor: "#777777"
+                                    gridOpacity: 0.16
                                 }
                             }
 
