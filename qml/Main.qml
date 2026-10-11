@@ -503,8 +503,34 @@ ApplicationWindow {
 
         faceIndexSpinner.value = Math.min(faceIndexSpinner.value, geometry.faceCount - 1)
         vertexIndexSpinner.value = Math.min(vertexIndexSpinner.value, geometry.vertexCount - 1)
+        mergeTargetSpinner.value = Math.min(mergeTargetSpinner.value, geometry.vertexCount - 1)
         refreshMeshEditFields()
         setStatus("Deleted face and compacted unused mesh vertices.")
+    }
+
+    function mergeSelectedVertices() {
+        const geometry = selectedEditableGeometry()
+        if (!geometry)
+            return
+
+        const sourceIndex = vertexIndexSpinner.value
+        const targetIndex = mergeTargetSpinner.value
+        if (sourceIndex === targetIndex) {
+            setStatus("Choose two different vertex indices to merge.")
+            return
+        }
+
+        pushUndoSnapshot()
+        if (!geometry.mergeVertices(sourceIndex, targetIndex)) {
+            setStatus("Vertex merge failed; the mesh was left unchanged.")
+            return
+        }
+
+        vertexIndexSpinner.value = Math.min(targetIndex, geometry.vertexCount - 1)
+        faceIndexSpinner.value = Math.min(faceIndexSpinner.value, geometry.faceCount - 1)
+        mergeTargetSpinner.value = Math.min(vertexIndexSpinner.value, geometry.vertexCount - 1)
+        refreshMeshEditFields()
+        setStatus("Merged vertex " + sourceIndex + " into vertex " + targetIndex + ".")
     }
 
     function updateTransform(axis, inputText) {
@@ -1005,6 +1031,46 @@ ApplicationWindow {
                 }
 
                 Text {
+                    text: "MERGE VERTICES"
+                    color: "#bcbcbc"
+                    font.pixelSize: 10
+                    font.bold: true
+                    font.letterSpacing: 1.2
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Text {
+                        text: "Merge current vertex into"
+                        color: root.secondaryText
+                        font.pixelSize: 11
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                    }
+                    SpinBox {
+                        id: mergeTargetSpinner
+                        from: 0
+                        to: Math.max(0, root.selectedObject && !root.selectedObject.editorImported
+                                      ? root.selectedObject.geometry.vertexCount - 1 : 0)
+                        value: 1
+                        editable: true
+                    }
+                }
+
+                Button {
+                    Layout.fillWidth: true
+                    text: "Merge Vertices"
+                    enabled: root.selectedObject !== null && !root.selectedObject.editorImported
+                    onClicked: root.mergeSelectedVertices()
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 1
+                    color: root.borderColor
+                }
+
+                Text {
                     text: "FACE TOOLS"
                     color: "#bcbcbc"
                     font.pixelSize: 10
@@ -1077,7 +1143,7 @@ ApplicationWindow {
 
                 Text {
                     Layout.fillWidth: true
-                    text: "Click the viewport markers to choose a vertex or face. This early toolset supports vertex coordinates, face extrusion, inset on convex planar faces, and face deletion. Edge selection, bevel, merge, and advanced Edit Mode tools are still under development."
+                    text: "Click viewport markers to select vertices or faces. Tools: vertex coordinates, merge vertices, face extrusion, inset on convex planar faces, and face deletion. Edge selection, bevel, loop tools and advanced topology operations remain future work."
                     color: "#777777"
                     font.pixelSize: 10
                     wrapMode: Text.WordWrap
