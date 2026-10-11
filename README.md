@@ -31,7 +31,7 @@ The initial desktop prototype uses **C++ with Qt 6 and Qt Quick 3D** for the int
 
 ## Build
 
-A Qt 6 development environment with the Quick, Quick Controls, and Quick 3D modules is required.
+A Qt 6 development environment with the Quick, Quick Controls, Quick Dialogs, and Quick 3D modules is required. Ubuntu 24.04 provides a matching Qt 6.4 toolchain for the current CI build.
 
     cmake -S . -B build
     cmake --build build --config Release
