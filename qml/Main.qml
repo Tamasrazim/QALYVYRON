@@ -1276,7 +1276,7 @@ ApplicationWindow {
         modal: true
         focus: true
         width: 460
-        height: 310
+        height: 380
         x: (root.width - width) / 2
         y: (root.height - height) / 2
         standardButtons: Dialog.NoButton
@@ -1286,7 +1286,7 @@ ApplicationWindow {
 
             Text {
                 Layout.fillWidth: true
-                text: "Render the saved scene geometry to a full-resolution PNG. This runs separately from the live viewport and keeps the workspace responsive."
+                text: "Render the current scene geometry to a full-resolution PNG. This runs separately from the live viewport and keeps the workspace responsive."
                 color: root.secondaryText
                 font.pixelSize: 11
                 wrapMode: Text.WordWrap
