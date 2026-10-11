@@ -4,7 +4,7 @@ QALYVYRON is early-stage software. Small, reviewable changes are preferred over 
 
 ## Local setup
 
-Install a C++17 compiler, CMake 3.21 or later, Ninja (recommended), and Qt 6.5 or later with the Quick, Quick Controls, Quick 3D, and Quick Dialogs modules.
+Install a C++17 compiler, CMake 3.21 or later, Ninja (recommended), and Qt 6.4 or later with the Quick, Quick Controls, Quick 3D, and Quick Dialogs modules.
 
 Configure and build:
 
