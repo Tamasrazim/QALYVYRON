@@ -10,11 +10,14 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
+include(CTest)
+
 find_package(Qt6 6.5 REQUIRED COMPONENTS
     Quick
     QuickControls2
     Quick3D
     QuickDialogs2
+    Test
 )
 
 qt_standard_project_setup(REQUIRES 6.5)
@@ -49,3 +52,14 @@ install(TARGETS QALYVYRON
     RUNTIME DESTINATION bin
     BUNDLE DESTINATION .
 )
+
+if(BUILD_TESTING)
+    qt_add_executable(qalyvyron_projectio_tests
+        tests/test_projectio.cpp
+        src/projectio.cpp
+        include/projectio.h
+    )
+    target_include_directories(qalyvyron_projectio_tests PRIVATE include)
+    target_link_libraries(qalyvyron_projectio_tests PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME ProjectIOTests COMMAND qalyvyron_projectio_tests)
+endif()
