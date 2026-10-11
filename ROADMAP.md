@@ -4,7 +4,7 @@ The target is a **usable, independent desktop alternative to Blender for everyda
 
 ## Current state
 
-QALYVYRON is an early prototype. It now has a Qt Quick 3D viewport, primitive scene objects, object transforms, a hierarchy, primitive material controls, camera/light settings, versioned scene files and viewport-preview export. The editable mesh kernel supports indexed vertex changes, convex planar face extrusion/inset, local geometry-only OBJ import, and OBJ export with transforms baked. Runtime-loaded GLB/glTF remains read-only. These new pathways still need a green build and runtime smoke tests before being treated as validated features.
+QALYVYRON is an active mainline desktop application under development. It now has a Qt Quick 3D viewport, primitive scene objects, object transforms, a hierarchy, primitive material controls, camera/light settings, versioned scene files and viewport-preview export. The editable mesh kernel supports indexed vertex changes, viewport-driven face creation from ordered vertex selections, vertex merging, convex planar face extrusion/inset, face deletion, local geometry-only OBJ import, and OBJ export with transforms baked. Runtime-loaded GLB/glTF remains read-only. These new pathways still need a green build and runtime smoke tests before being treated as validated features.
 
 ## Stage 1 — Dependable scene workspace
 
