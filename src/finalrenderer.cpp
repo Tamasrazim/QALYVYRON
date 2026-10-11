@@ -295,7 +295,10 @@ bool appendSceneTriangles(const QVariantMap &scene,
         const QQuaternion rotation = QQuaternion::fromEulerAngles(
             static_cast<float>(rx), static_cast<float>(ry), static_cast<float>(rz));
 
-        QColor color(object.value(QStringLiteral("color")).toString(QStringLiteral("#c8c8c8")));
+        QString colorText = object.value(QStringLiteral("color")).toString();
+        if (colorText.isEmpty())
+            colorText = QStringLiteral("#c8c8c8");
+        QColor color(colorText);
         if (!color.isValid())
             color = QColor(QStringLiteral("#c8c8c8"));
         const QVector3D albedo = colorToLinear(color);
