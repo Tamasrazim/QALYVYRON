@@ -156,6 +156,8 @@ ApplicationWindow {
     }
 
     function selectObject(objectId) {
+        clearMeshVertexSelection()
+        vertexSelectionMode = false
         selectedIndex = -1
         selectedObject = null
 
@@ -551,6 +553,8 @@ ApplicationWindow {
         faceIndexSpinner.value = Math.min(faceIndexSpinner.value, geometry.faceCount - 1)
         vertexIndexSpinner.value = Math.min(vertexIndexSpinner.value, geometry.vertexCount - 1)
         mergeTargetSpinner.value = Math.min(mergeTargetSpinner.value, geometry.vertexCount - 1)
+        clearMeshVertexSelection()
+        vertexSelectionMode = false
         refreshMeshEditFields()
         setStatus("Deleted face and compacted unused mesh vertices.")
     }
@@ -576,6 +580,8 @@ ApplicationWindow {
         vertexIndexSpinner.value = Math.min(targetIndex, geometry.vertexCount - 1)
         faceIndexSpinner.value = Math.min(faceIndexSpinner.value, geometry.faceCount - 1)
         mergeTargetSpinner.value = Math.min(vertexIndexSpinner.value, geometry.vertexCount - 1)
+        clearMeshVertexSelection()
+        vertexSelectionMode = false
         refreshMeshEditFields()
         setStatus("Merged vertex " + sourceIndex + " into vertex " + targetIndex + ".")
     }
@@ -1350,7 +1356,7 @@ ApplicationWindow {
                         font.letterSpacing: 2.2
                     }
                     Text {
-                        text: "3D STUDIO  /  EARLY PROTOTYPE"
+                        text: "3D CREATION WORKSPACE"
                         color: root.secondaryText
                         font.pixelSize: 9
                         font.letterSpacing: 1.1
