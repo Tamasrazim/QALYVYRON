@@ -13,6 +13,8 @@ private slots:
     void primitiveShapesHaveExpectedTopology();
     void vertexEditsChangeSerializedMesh();
     void extrudingFaceAddsCapAndSides();
+    void insettingFaceAddsInnerCapAndRing();
+    void invalidInsetIsAtomic();
     void invalidExtrusionIsRejected();
     void invalidMeshLoadLeavesCurrentMeshUntouched();
     void meshRoundTripsThroughVariantMap();
@@ -71,6 +73,32 @@ void EditableGeometryTests::extrudingFaceAddsCapAndSides()
 
     const QVector3D centerAfter = geometry.faceCenter(0);
     QVERIFY(QVector3D::dotProduct(centerAfter - centerBefore, normal) > 9.9f);
+}
+
+void EditableGeometryTests::insettingFaceAddsInnerCapAndRing()
+{
+    EditableGeometry geometry;
+    const QVector3D centerBefore = geometry.faceCenter(0);
+    const QVector3D normal = geometry.faceNormal(0);
+
+    QVERIFY(geometry.insetFace(0, 10.0));
+    QCOMPARE(geometry.vertexCount(), 12);
+    QCOMPARE(geometry.faceCount(), 10);
+    QVERIFY((geometry.faceCenter(0) - centerBefore).length() < 1.0e-3f);
+    QVERIFY(QVector3D::dotProduct(geometry.faceNormal(0), normal) > 0.99f);
+    QCOMPARE(geometry.vertexPosition(8), QVector3D(-40, -40, 50));
+}
+
+void EditableGeometryTests::invalidInsetIsAtomic()
+{
+    EditableGeometry geometry;
+    const QVariantMap before = geometry.serializeMesh();
+
+    QVERIFY(!geometry.insetFace(-1, 10.0));
+    QVERIFY(!geometry.insetFace(0, 0.0));
+    QVERIFY(!geometry.insetFace(0, -2.0));
+    QVERIFY(!geometry.insetFace(0, 60.0));
+    QCOMPARE(geometry.serializeMesh(), before);
 }
 
 void EditableGeometryTests::invalidExtrusionIsRejected()
