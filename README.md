@@ -4,7 +4,7 @@
 
 QALYVYRON is being developed as a local desktop tool for creating, editing, animating, and rendering 3D work without requiring Blender, a paid subscription, or a cloud account. The goal is not to imitate Blender's interface; it is to provide a workflow that is easier to discover, mouse-friendly by default, and capable of finishing real projects.
 
-**Status: active prototype — not yet a drop-in Blender replacement.** The current build covers the first scene-workspace foundations. It does not yet have full polygon modeling, a final offline renderer, a complete animation system, or production asset export. Those gaps are explicit work items, not features that this repository claims to have finished.
+**Status: active prototype — not yet a drop-in Blender replacement.** QALYVYRON now has an initial editable mesh kernel and a usable geometry-only OBJ import/export path, but it still lacks full mouse-driven Edit Mode, a production final renderer, a complete animation system, UV/texture workflows, and production packaging. Those gaps remain explicit work items.
 
 ## Current prototype capabilities
 
@@ -16,14 +16,16 @@ QALYVYRON is being developed as a local desktop tool for creating, editing, anim
 - Camera field-of-view and key/fill-light controls.
 - Versioned `.qvscene` project files with local save/open validation, including the editable mesh topology.
 - Undo and redo history for common scene, transform, material, camera, and light edits.
-- Initial import path for local glTF 2.0 (`.glb`, `.gltf`) and Wavefront OBJ (`.obj`) files. Imported asset materials are preserved, but not yet editable in the inspector.
+- **Wavefront OBJ (`.obj`) import:** vertex positions and polygon faces are parsed into QALYVYRON's editable mesh data. OBJ meshes are embedded in `.qvscene` projects and can be edited with indexed vertex coordinates and face extrusion.
+- **Wavefront OBJ export:** writes editable mesh objects with their scene transforms baked into exported vertex positions. Runtime-loaded `.glb`/`.gltf` assets are skipped with a clear warning.
+- **glTF 2.0 (`.glb`, `.gltf`) preview import:** loaded by Qt Quick 3D's runtime loader. These objects remain read-only and reference their original local files.
 - PNG export of the viewport preview. **This is not a final offline render.**
 
-Imported assets are linked by their local file URL. Keep those source files at the same location when reopening a project on this early build; automatic asset collection and portable project packaging are still planned.
+The first OBJ path is geometry-only: it currently reads `v` and `f` data, not OBJ normals, UV coordinates, MTL materials, or textures. glTF source paths are not yet collected into portable project folders, so those files must remain at their original locations when reopening scenes.
 
 ## What must be built before it can replace Blender for daily work
 
-The major remaining systems are real mesh-edit mode (vertex, edge and face operations), reliable import and export, UV and texture workflows, a node-based material system, a production-quality offline renderer, animation and timeline tools, render queues, and a complete Windows installer. The acceptance criteria live in [ROADMAP.md](ROADMAP.md).
+The major remaining systems are full mouse-driven vertex/edge/face selection, bevel/inset/merge/loop tools, robust topology operations, UV and texture workflows, node-based materials, a production-quality offline renderer, animation and timeline tools, render queues, broader asset interoperability, and a complete tested Windows installer. The acceptance criteria live in [ROADMAP.md](ROADMAP.md).
 
 The rule for the project is simple: **a control is not considered implemented just because it appears in the interface.** It must perform the advertised work and be tested. Builds and file-format limits should be documented honestly.
 
@@ -60,7 +62,7 @@ cmake --build build --parallel 2
 ctest --test-dir build --output-on-failure
 ```
 
-The CI workflow validates Linux builds and is being extended to produce a portable Windows x64 package. A downloadable package is only considered usable once the Windows job has passed; a successful C++ build alone does not prove the QML application works on every GPU.
+The CI workflow builds and tests on Linux and builds a Windows x64 package. The Windows packaging step recently exposed a missing Qt Quick Timeline deployment dependency, so the updated dependency and latest mesh/OBJ changes still need a fresh green run before a Windows package can be considered validated. A successful C++ build alone does not prove the QML application works on every GPU.
 
 ## Repository files
 
