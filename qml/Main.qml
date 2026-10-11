@@ -44,6 +44,7 @@ ApplicationWindow {
     property int requestedRenderWidth: 1920
     property int requestedRenderHeight: 1080
     property int requestedRenderSamples: 8
+    property int requestedRenderBounces: 1
     property real renderProgressValue: 0
     property string renderStatusText: "Ready"
 
@@ -1323,9 +1324,26 @@ ApplicationWindow {
                 }
             }
 
+            RowLayout {
+                Layout.fillWidth: true
+                Text {
+                    text: "Diffuse light bounces"
+                    color: root.secondaryText
+                    font.pixelSize: 11
+                }
+                Item { Layout.fillWidth: true }
+                SpinBox {
+                    id: renderBouncesSpinBox
+                    from: 0
+                    to: 4
+                    value: 1
+                    editable: true
+                }
+            }
+
             Text {
                 Layout.fillWidth: true
-                text: "Higher sample counts reduce edge noise but increase render time. 8K output is supported up to the application pixel-memory limit. The renderer currently provides direct lighting and hard shadows; indirect light transport is not implemented yet."
+                text: "Higher sample counts reduce edge noise; diffuse bounces add indirect light. Both increase render time. 8K output is supported within the pixel and ray-work budgets. Shadows are currently hard-edged and there is no denoiser yet."
                 color: "#777777"
                 font.pixelSize: 10
                 wrapMode: Text.WordWrap
@@ -1346,6 +1364,7 @@ ApplicationWindow {
                         root.requestedRenderWidth = Number(parts[0])
                         root.requestedRenderHeight = Number(parts[1])
                         root.requestedRenderSamples = renderSamplesSpinBox.value
+                        root.requestedRenderBounces = renderBouncesSpinBox.value
                         renderSettingsDialog.close()
                         Qt.callLater(renderOutputDialog.open)
                     }
@@ -1367,7 +1386,8 @@ ApplicationWindow {
                 root.serializeScene(),
                 root.requestedRenderWidth,
                 root.requestedRenderHeight,
-                root.requestedRenderSamples)
+                root.requestedRenderSamples,
+                root.requestedRenderBounces)
             if (started) {
                 root.renderProgressValue = 0
                 root.renderProgressDialog.open()
