@@ -2,6 +2,7 @@
 
 #include <QByteArray>
 #include <QVariantList>
+#include <QSet>
 
 #include <algorithm>
 #include <cmath>
@@ -162,6 +163,14 @@ bool EditableGeometry::extrudeFace(int faceIndex, double distance)
         return false;
     }
 
+    qint64 currentRenderedVertices = 0;
+    for (const QVector<int> &face : m_faces)
+        currentRenderedVertices += static_cast<qint64>(face.size() - 2) * 3;
+    const qint64 projectedRenderedVertices =
+        currentRenderedVertices + static_cast<qint64>(boundary.size()) * 6;
+    if (projectedRenderedVertices > kMaximumRenderedVertices)
+        return false;
+
     QVector<int> extruded;
     extruded.reserve(boundary.size());
     const QVector3D offset = normal * static_cast<float>(distance);
@@ -236,37 +245,47 @@ bool EditableGeometry::loadMesh(const QVariantMap &data)
         if (components.size() != 3)
             return false;
 
-        const QVector3D vertex(components.at(0).toFloat(),
-                               components.at(1).toFloat(),
-                               components.at(2).toFloat());
-        if (!finiteVector(vertex)
-            || std::abs(vertex.x()) > 1.0e6f
-            || std::abs(vertex.y()) > 1.0e6f
-            || std::abs(vertex.z()) > 1.0e6f) {
-            return false;
+        double coordinate[3] = {};
+        for (int i = 0; i < 3; ++i) {
+            bool converted = false;
+            coordinate[i] = components.at(i).toDouble(&converted);
+            if (!converted || !std::isfinite(coordinate[i])
+                || std::abs(coordinate[i]) > 1.0e6)
+                return false;
         }
+
+        const QVector3D vertex(static_cast<float>(coordinate[0]),
+                               static_cast<float>(coordinate[1]),
+                               static_cast<float>(coordinate[2]));
+        if (!finiteVector(vertex))
+            return false;
         vertices.append(vertex);
     }
 
     QVector<QVector<int>> faces;
     faces.reserve(rawFaces.size());
+    qint64 renderedVertexCount = 0;
     for (const QVariant &rawFace : rawFaces) {
         const QVariantList rawCorners = rawFace.toList();
         if (rawCorners.size() < 3 || rawCorners.size() > kMaximumFaceCorners)
             return false;
 
+        renderedVertexCount += static_cast<qint64>(rawCorners.size() - 2) * 3;
+        if (renderedVertexCount > kMaximumRenderedVertices)
+            return false;
+
         QVector<int> face;
         face.reserve(rawCorners.size());
-        for (const QVariant &rawIndex : rawCorners)
-            face.append(rawIndex.toInt());
-
-        for (const int index : face) {
-            if (index < 0 || index >= vertices.size())
+        QSet<int> uniqueCorners;
+        for (const QVariant &rawIndex : rawCorners) {
+            bool converted = false;
+            const int index = rawIndex.toInt(&converted);
+            if (!converted || index < 0 || index >= vertices.size()
+                || uniqueCorners.contains(index)) {
                 return false;
-        }
-        for (int i = 0; i < face.size(); ++i) {
-            if (face.at(i) == face.at((i + 1) % face.size()))
-                return false;
+            }
+            uniqueCorners.insert(index);
+            face.append(index);
         }
 
         // Validate using the candidate vertex array without mutating the live mesh.
