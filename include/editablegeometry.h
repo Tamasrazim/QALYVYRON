@@ -29,6 +29,7 @@ public:
     Q_INVOKABLE QVector3D faceCenter(int index) const;
     Q_INVOKABLE QVector3D faceNormal(int index) const;
     Q_INVOKABLE bool extrudeFace(int faceIndex, double distance);
+    Q_INVOKABLE bool insetFace(int faceIndex, double distance);
     Q_INVOKABLE QVariantMap serializeMesh() const;
     Q_INVOKABLE bool loadMesh(const QVariantMap &data);
 
