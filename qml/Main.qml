@@ -272,6 +272,29 @@ ApplicationWindow {
     }
 
     function createImportedAsset(sourceUrl) {
+        const sourceText = String(sourceUrl || "")
+        if (/\.obj$/i.test(sourceText.split(/[?#]/)[0])) {
+            const result = projectIO.importObj(sourceUrl)
+            if (!result.ok) {
+                setStatus("OBJ import failed: " + result.error)
+                return
+            }
+
+            pushUndoSnapshot()
+            addPrimitive("Custom", {
+                label: result.label || "Imported OBJ Mesh",
+                x: objectList.count * 120,
+                y: 0,
+                z: 0,
+                scale: 1,
+                color: "#c8c8c8",
+                roughness: 0.48,
+                mesh: result.mesh
+            })
+            setStatus("Imported editable OBJ mesh: " + (result.label || "Mesh") + ".")
+            return
+        }
+
         pushUndoSnapshot()
         addImportedAsset(sourceUrl)
     }
@@ -676,8 +699,10 @@ ApplicationWindow {
                 addImportedAsset(entry.source, entry)
                 continue
             }
+            const isCustomMesh = entry.shape === "Custom" && entry.mesh
+                                 && entry.mesh.vertices && entry.mesh.faces
             const shape = ["Cube", "Sphere", "Cylinder", "Cone", "Plane"].indexOf(entry.shape) >= 0
-                         ? entry.shape : "Cube"
+                         ? entry.shape : (isCustomMesh ? "Custom" : "Cube")
             addPrimitive(shape, entry)
         }
 
@@ -1032,6 +1057,25 @@ ApplicationWindow {
     }
 
     FileDialog {
+        id: exportObjDialog
+        title: "Export Editable Meshes as Wavefront OBJ"
+        fileMode: FileDialog.SaveFile
+        nameFilters: ["Wavefront OBJ (*.obj)"]
+        defaultSuffix: "obj"
+
+        onAccepted: {
+            const result = projectIO.exportObj(selectedFile, root.serializeScene())
+            if (!result.ok) {
+                root.setStatus("OBJ export failed: " + result.error)
+            } else if (result.warning) {
+                root.setStatus("OBJ exported to " + result.path + ". " + result.warning)
+            } else {
+                root.setStatus("OBJ exported to " + result.path)
+            }
+        }
+    }
+
+    FileDialog {
         id: exportImageDialog
         title: "Export Viewport Preview"
         fileMode: FileDialog.SaveFile
@@ -1120,6 +1164,10 @@ ApplicationWindow {
                     font.letterSpacing: 1.2
                 }
 
+                Button {
+                    text: "Export OBJ"
+                    onClicked: exportObjDialog.open()
+                }
                 Button {
                     text: "Export Preview"
                     highlighted: true
