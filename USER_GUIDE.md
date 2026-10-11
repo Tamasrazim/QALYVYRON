@@ -17,6 +17,17 @@ The application opens with a cube and sphere. Use the **Create** panel to add a 
 
 Use the inspector's numeric position, rotation, and scale fields when you need exact values. The transform gizmo is an early convenience control; axis-constrained movement is not yet implemented.
 
+## Edit a built-in mesh
+
+Select a cube, sphere, cylinder, cone, or plane, then click **Edit Selected Mesh**. The early mesh editor supports two actual topology operations:
+
+1. **Vertex coordinates:** choose a vertex index and edit its X, Y, or Z coordinate. The selected vertex is marked in the viewport.
+2. **Face extrusion:** choose a face index, enter a non-zero distance, and click **Extrude Face**. A new cap and side faces are added to the mesh; the selected face center is marked in the viewport.
+
+The vertex and face indices are shown as zero-based values. The editor also displays the selected face's center and normal. Mesh data is stored in the scene file, restored when the project opens, and included when you duplicate a built-in mesh. Undo and redo checkpoints include the mesh topology.
+
+This is the first usable slice of mesh editing, not a complete Blender-style Edit Mode. Direct mouse selection of individual vertices, edges, and faces, plus bevel, inset, merge, loop selection, and advanced topology tools, are still missing.
+
 ## Import a 3D asset
 
 Choose **Import 3D Asset** and select a local:
@@ -47,7 +58,7 @@ The PNG is only the current viewport image. It is not an offline/path-traced fin
 
 ## Current limits
 
-There is no full vertex/edge/face modeling mode, extrusion/bevel/subdivision toolset, editable node-based material system, complete UV workflow, production offline renderer, animation timeline, rigging system, or finished installer yet. Do not move an important project away from its source assets or rely on the prototype as the only copy of valuable work. Keep backups while testing.
+There is no full mouse-driven vertex/edge/face selection mode, bevel/inset/merge/loop toolset, modifier stack, editable node-based material system, complete UV workflow, production offline renderer, animation timeline, rigging system, or finished installer yet. Vertex-coordinate editing and single-face extrusion are implemented as early mesh tools, but still need current-build validation. Do not move an important project away from its source assets or rely on the prototype as the only copy of valuable work. Keep backups while testing.
 
 ## Report a reproducible issue
 
