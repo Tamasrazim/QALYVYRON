@@ -1,6 +1,6 @@
-# QALYVYRON — Prototype Guide
+# QALYVYRON — User Guide
 
-This guide describes the current early build. It is not a claim that all Blender workflows are supported yet.
+This guide covers the current mainline application. Remaining feature gaps are listed explicitly so you can distinguish supported editing tasks from workflows that are still under development.
 
 ## Start a scene
 
@@ -28,7 +28,7 @@ Select a cube, sphere, cylinder, cone, or plane, then click **Edit Selected Mesh
 
 The vertex and face indices are shown as zero-based values. The editor also displays the selected face's center and normal. Mesh data is stored in the scene file, restored when the project opens, and included when you duplicate a built-in mesh. Undo and redo checkpoints include the mesh topology.
 
-This is still an early mesh editor, not a complete Blender-style Edit Mode. Vertex and face-center markers are clickable; full edge selection, bevel, merge, loop selection, multi-selection, and advanced topology tools are still missing.
+This mesh workspace supports vertex and face-center selection, ordered vertex multi-selection for face creation, merge vertices, vertex-coordinate editing, face extrusion and inset, and face deletion. Full edge selection, bevel, loop operations, modifiers, and advanced topology tools are still missing.
 
 ## Import a 3D asset
 
