@@ -493,4 +493,5 @@ void EditableGeometry::rebuildGeometry()
                  QQuick3DGeometry::Attribute::F32Type);
     setVertexData(vertexBuffer);
     setBounds(minimum, maximum);
+    update();
 }
