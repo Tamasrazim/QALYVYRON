@@ -74,6 +74,31 @@ jobs:
           windeployqt --release --qmldir qml "$PWD/dist/bin/QALYVYRON.exe"
           Copy-Item README.md "$PWD/dist/README.md"
           Copy-Item ROADMAP.md "$PWD/dist/ROADMAP.md"
+
+      - name: Launch the packaged application
+        shell: pwsh
+        run: |
+          $exe = Join-Path $PWD "dist/bin/QALYVYRON.exe"
+          $stdout = Join-Path $PWD "qalyvyron-startup.stdout.log"
+          $stderr = Join-Path $PWD "qalyvyron-startup.stderr.log"
+          $process = Start-Process -FilePath $exe -PassThru -WindowStyle Hidden `
+            -WorkingDirectory (Split-Path $exe) `
+            -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+          Start-Sleep -Seconds 8
+          $process.Refresh()
+          if ($process.HasExited) {
+            Write-Host "Application stdout:"
+            if (Test-Path $stdout) { Get-Content $stdout }
+            Write-Host "Application stderr:"
+            if (Test-Path $stderr) { Get-Content $stderr }
+            throw "QALYVYRON exited during the Windows startup smoke test (exit code $($process.ExitCode))."
+          }
+          Stop-Process -Id $process.Id -Force
+          Write-Host "QALYVYRON stayed running through the startup smoke test."
+
+      - name: Package portable application
+        shell: pwsh
+        run: |
           Compress-Archive -Path "$PWD/dist/bin/*" -DestinationPath "$PWD/QALYVYRON-Windows-x64.zip" -Force
 
       - name: Upload Windows portable package
