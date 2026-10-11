@@ -282,6 +282,11 @@ bool EditableGeometry::insetFace(int faceIndex, double distance)
     QVector<QVector2D> insetPolygon;
     insetPolygon.reserve(boundary.size());
 
+    QVector2D polygonCentroid;
+    for (const QVector2D &point : polygon)
+        polygonCentroid += point;
+    polygonCentroid /= static_cast<float>(polygon.size());
+
     const float insetDistance = static_cast<float>(distance);
     for (int i = 0; i < polygon.size(); ++i) {
         const int previous = (i + polygon.size() - 1) % polygon.size();
@@ -297,6 +302,14 @@ bool EditableGeometry::insetFace(int faceIndex, double distance)
         const float parameter = cross2d(pointB - pointA, directionB) / denominator;
         const QVector2D insetPoint = pointA + directionA * parameter;
         if (!std::isfinite(insetPoint.x()) || !std::isfinite(insetPoint.y()))
+            return false;
+
+        // In an oversized inset, offset lines can cross and form a small loop
+        // whose area appears valid despite its corners having swapped sides.
+        // Every inset corner must remain on the same side of the face centroid.
+        const QVector2D originalRadius = polygon.at(i) - polygonCentroid;
+        const QVector2D insetRadius = insetPoint - polygonCentroid;
+        if (QVector2D::dotProduct(originalRadius, insetRadius) <= 1.0e-5f)
             return false;
 
         insetPolygon.append(insetPoint);
