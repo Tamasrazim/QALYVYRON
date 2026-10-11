@@ -4,7 +4,7 @@
 
 QALYVYRON is being developed as a local desktop tool for creating, editing, animating, and rendering 3D work without requiring Blender, a paid subscription, or a cloud account. The goal is not to imitate Blender's interface; it is to provide a workflow that is easier to discover, mouse-friendly by default, and capable of finishing real projects.
 
-**Status: active mainline development build — not yet a finished Blender replacement.** QALYVYRON now has an initial editable mesh kernel and a usable geometry-only OBJ import/export path, but it still lacks full mouse-driven Edit Mode, a production final renderer, a complete animation system, UV/texture workflows, and production packaging. Those gaps remain explicit work items.
+**Status: active mainline development build — not yet a finished Blender replacement.** QALYVYRON now has an initial editable mesh kernel and a usable geometry-only OBJ import/export path, but it still lacks full edge/loop modeling, a full PBR material and texture pipeline, animation, soft shadows/denoising and complete production packaging. Those gaps remain explicit work items.
 
 ## Implemented in the main build
 
@@ -19,13 +19,14 @@ QALYVYRON is being developed as a local desktop tool for creating, editing, anim
 - **Wavefront OBJ (`.obj`) import:** vertex positions and polygon faces are parsed into QALYVYRON's editable mesh data. OBJ meshes are embedded in `.qvscene` projects and can be edited with indexed vertex coordinates and face extrusion.
 - **Wavefront OBJ export:** writes editable mesh objects with their scene transforms baked into exported vertex positions. Runtime-loaded `.glb`/`.gltf` assets are skipped with a clear warning.
 - **glTF 2.0 (`.glb`, `.gltf`) preview import:** loaded by Qt Quick 3D's runtime loader. These objects remain read-only and reference their original local files.
-- PNG export of the viewport preview. **This is not a final offline render.**
+- CPU offline final PNG rendering from scene triangles with a BVH accelerator, multisample anti-aliasing, directional/point lighting, hard shadows, material roughness, and configurable diffuse indirect bounces.
+- Separate viewport-preview PNG export for quick captures. It is not confused with a final offline render.
 
 The first OBJ path is geometry-only: it currently reads `v` and `f` data, not OBJ normals, UV coordinates, MTL materials, or textures. glTF source paths are not yet collected into portable project folders, so those files must remain at their original locations when reopening scenes.
 
 ## What must be built before it can replace Blender for daily work
 
-The major remaining systems are robust vertex/edge/face selection and edge modeling, bevel/loop tools, non-destructive modifiers, UV and texture workflows, node-based materials, a production-quality offline renderer, animation and timeline tools, render queues, broader asset interoperability, and a complete tested Windows installer. The acceptance criteria live in [ROADMAP.md](ROADMAP.md).
+The major remaining systems are edge selection/modeling, bevel and loop tools, non-destructive modifiers, UV and texture workflows, node-based materials, renderer denoising and soft-shadow quality, rigging/animation/timeline tools, render queues, broader asset interoperability, and a complete tested Windows installer. The acceptance criteria live in [ROADMAP.md](ROADMAP.md).
 
 The rule for the project is simple: **a control is not considered implemented just because it appears in the interface.** It must perform the advertised work and be tested. Builds and file-format limits should be documented honestly.
 
@@ -42,7 +43,7 @@ The rule for the project is simple: **a control is not considered implemented ju
 
 ## Technology
 
-The desktop application uses C++17, Qt 6, Qt Quick 3D and QML. Qt Quick 3D provides the current real-time viewport; the long-term architecture must add a dedicated modeling data layer and a final-render backend instead of treating a viewport screenshot as a rendered image.
+The desktop application uses C++17, Qt 6, Qt Quick 3D and QML. Qt Quick 3D powers the live viewport; a separate CPU renderer traces camera rays against the saved mesh triangles and writes a real PNG output without capturing the viewport.
 
 The application does not use Blender as a library or launch Blender in the background.
 
