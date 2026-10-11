@@ -24,6 +24,7 @@ Select a cube, sphere, cylinder, cone, or plane, then click **Edit Selected Mesh
 1. **Vertex coordinates:** choose a vertex index and edit its X, Y, or Z coordinate. The selected vertex is marked in the viewport.
 2. **Face extrusion:** click a face-center marker or choose its index, enter a non-zero distance, and click **Extrude Face**. A new cap and side faces are added to the mesh.
 3. **Face inset:** select a convex planar face, enter a positive inset distance, and click **Inset Face**. The selected face is shrunk by offsetting its edges and adding a surrounding ring. Excessive insets and non-convex or warped faces are rejected.
+4. **Delete face:** choose a face marker and click **Delete Face**. The face is removed and unused vertices are compacted. QALYVYRON prevents deleting the final face of an object; use Undo if you remove the wrong surface.
 
 The vertex and face indices are shown as zero-based values. The editor also displays the selected face's center and normal. Mesh data is stored in the scene file, restored when the project opens, and included when you duplicate a built-in mesh. Undo and redo checkpoints include the mesh topology.
 
