@@ -352,11 +352,11 @@ QVariantMap EditableGeometry::serializeMesh() const
     QVariantList vertices;
     vertices.reserve(m_vertices.size());
     for (const QVector3D &vertex : m_vertices) {
-        vertices.append(QVariantList{
+        vertices.append(QVariant::fromValue(QVariantList{
             vertex.x(),
             vertex.y(),
             vertex.z()
-        });
+        }));
     }
 
     QVariantList faces;
@@ -366,7 +366,9 @@ QVariantMap EditableGeometry::serializeMesh() const
         corners.reserve(face.size());
         for (const int index : face)
             corners.append(index);
-        faces.append(corners);
+        // QVariantList inherits QList and would flatten this nested list if
+        // appended directly; wrap it in QVariant to preserve one face per entry.
+        faces.append(QVariant::fromValue(corners));
     }
 
     return {
