@@ -360,6 +360,55 @@ bool EditableGeometry::insetFace(int faceIndex, double distance)
     return true;
 }
 
+bool EditableGeometry::deleteFace(int faceIndex)
+{
+    // Leave at least one face so the object remains a usable mesh.
+    if (faceIndex < 0 || faceIndex >= m_faces.size() || m_faces.size() <= 1)
+        return false;
+
+    QVector<QVector<int>> remainingFaces = m_faces;
+    remainingFaces.removeAt(faceIndex);
+
+    QVector<bool> used(m_vertices.size(), false);
+    for (const QVector<int> &face : remainingFaces) {
+        for (const int index : face) {
+            if (index < 0 || index >= m_vertices.size())
+                return false;
+            used[index] = true;
+        }
+    }
+
+    // Compact unused vertices and remap all surviving faces before committing.
+    // Constructing this candidate first means malformed input cannot partially
+    // mutate the mesh if the operation is rejected.
+    QVector<int> remap(m_vertices.size(), -1);
+    QVector<QVector3D> compactVertices;
+    compactVertices.reserve(m_vertices.size());
+    for (int oldIndex = 0; oldIndex < m_vertices.size(); ++oldIndex) {
+        if (!used.at(oldIndex))
+            continue;
+        remap[oldIndex] = compactVertices.size();
+        compactVertices.append(m_vertices.at(oldIndex));
+    }
+
+    for (QVector<int> &face : remainingFaces) {
+        for (int &index : face) {
+            index = remap.at(index);
+            if (index < 0)
+                return false;
+        }
+    }
+
+    if (remainingFaces.isEmpty() || compactVertices.size() < 3)
+        return false;
+
+    m_vertices = compactVertices;
+    m_faces = remainingFaces;
+    rebuildGeometry();
+    emit meshChanged();
+    return true;
+}
+
 QVariantMap EditableGeometry::serializeMesh() const
 {
     QVariantList vertices;
