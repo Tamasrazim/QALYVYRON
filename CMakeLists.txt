@@ -69,7 +69,7 @@ if(BUILD_TESTING)
         include/projectio.h
     )
     target_include_directories(qalyvyron_projectio_tests PRIVATE include)
-    target_link_libraries(qalyvyron_projectio_tests PRIVATE Qt6::Core Qt6::Test)
+    target_link_libraries(qalyvyron_projectio_tests PRIVATE Qt6::Core Qt6::Gui Qt6::Test)
     add_test(NAME ProjectIOTests COMMAND qalyvyron_projectio_tests)
 
     qt_add_executable(qalyvyron_geometry_tests
