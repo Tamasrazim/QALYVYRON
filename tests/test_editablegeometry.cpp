@@ -15,6 +15,7 @@ private slots:
     void extrudingFaceAddsCapAndSides();
     void insettingFaceAddsInnerCapAndRing();
     void invalidInsetIsAtomic();
+    void deleteFaceRemovesSurfaceAndCompactsVertices();
     void invalidExtrusionIsRejected();
     void invalidMeshLoadLeavesCurrentMeshUntouched();
     void meshRoundTripsThroughVariantMap();
@@ -99,6 +100,22 @@ void EditableGeometryTests::invalidInsetIsAtomic()
     QVERIFY(!geometry.insetFace(0, -2.0));
     QVERIFY(!geometry.insetFace(0, 60.0));
     QCOMPARE(geometry.serializeMesh(), before);
+}
+
+void EditableGeometryTests::deleteFaceRemovesSurfaceAndCompactsVertices()
+{
+    EditableGeometry cube;
+    QVERIFY(cube.deleteFace(0));
+    QCOMPARE(cube.faceCount(), 5);
+    QCOMPARE(cube.vertexCount(), 8);
+
+    EditableGeometry plane;
+    const QVariantMap before = plane.serializeMesh();
+    QVERIFY(!plane.deleteFace(0)); // Keep at least one face in a mesh.
+    QCOMPARE(plane.serializeMesh(), before);
+
+    QVERIFY(!cube.deleteFace(-1));
+    QVERIFY(!cube.deleteFace(cube.faceCount()));
 }
 
 void EditableGeometryTests::invalidExtrusionIsRejected()
