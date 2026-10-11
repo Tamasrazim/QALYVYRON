@@ -11,7 +11,7 @@ QALYVYRON is being developed as a local desktop tool for creating, editing, anim
 - Interactive 3D viewport with orbit, zoom, selection, and a reference grid.
 - Cube, sphere, cylinder, cone, and plane scene objects.
 - Object hierarchy, renaming, duplication, deletion, and direct transform editing.
-- Early editable mesh tools for built-in primitives: inspect indexed vertices/faces, change an individual vertex coordinate, and extrude a selected face by index. The active vertex and face center are marked in the viewport while the mesh editor is open.
+- Editable polygon-mesh tools for built-in primitives and imported OBJ geometry: click vertex/face markers in the viewport, change vertex coordinates, extrude faces, and inset convex planar faces.
 - Material base-color palette and roughness for the built-in primitive objects.
 - Camera field-of-view and key/fill-light controls.
 - Versioned `.qvscene` project files with local save/open validation, including the editable mesh topology.
