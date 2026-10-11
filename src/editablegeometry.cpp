@@ -9,6 +9,7 @@
 
 namespace
 {
+constexpr float kPi = 3.14159265358979323846f;
 constexpr float kPrimitiveRadius = 50.0f;
 constexpr int kCylinderSegments = 32;
 constexpr int kSphereSegments = 32;
@@ -312,11 +313,11 @@ void EditableGeometry::createPrimitive(const QString &shape)
         rings.reserve(kSphereLatitudeBands - 1);
 
         for (int latitude = 1; latitude < kSphereLatitudeBands; ++latitude) {
-            const float phi = static_cast<float>(M_PI) * latitude / kSphereLatitudeBands;
+            const float phi = kPi * latitude / kSphereLatitudeBands;
             QVector<int> ring;
             ring.reserve(kSphereSegments);
             for (int longitude = 0; longitude < kSphereSegments; ++longitude) {
-                const float theta = 2.0f * static_cast<float>(M_PI) * longitude / kSphereSegments;
+                const float theta = 2.0f * kPi * longitude / kSphereSegments;
                 const float sinPhi = std::sin(phi);
                 ring.append(m_vertices.size());
                 m_vertices.append(QVector3D(
@@ -355,7 +356,7 @@ void EditableGeometry::createPrimitive(const QString &shape)
     } else if (shape == QLatin1String("Cylinder")) {
         for (int ySign : {-1, 1}) {
             for (int i = 0; i < kCylinderSegments; ++i) {
-                const float theta = 2.0f * static_cast<float>(M_PI) * i / kCylinderSegments;
+                const float theta = 2.0f * kPi * i / kCylinderSegments;
                 m_vertices.append(QVector3D(
                     kPrimitiveRadius * std::sin(theta),
                     ySign * kPrimitiveRadius,
@@ -382,7 +383,7 @@ void EditableGeometry::createPrimitive(const QString &shape)
         m_faces.append(top);
     } else if (shape == QLatin1String("Cone")) {
         for (int i = 0; i < kCylinderSegments; ++i) {
-            const float theta = 2.0f * static_cast<float>(M_PI) * i / kCylinderSegments;
+            const float theta = 2.0f * kPi * i / kCylinderSegments;
             m_vertices.append(QVector3D(
                 kPrimitiveRadius * std::sin(theta),
                 -kPrimitiveRadius,
