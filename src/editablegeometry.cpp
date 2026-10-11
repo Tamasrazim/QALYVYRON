@@ -3,6 +3,7 @@
 #include <QByteArray>
 #include <QVariantList>
 #include <QSet>
+#include <QVector2D>
 
 #include <algorithm>
 #include <cmath>
@@ -192,6 +193,147 @@ bool EditableGeometry::extrudeFace(int faceIndex, double distance)
         if (distance < 0)
             std::reverse(side.begin(), side.end());
         m_faces.append(side);
+    }
+
+    rebuildGeometry();
+    emit meshChanged();
+    return true;
+}
+
+bool EditableGeometry::insetFace(int faceIndex, double distance)
+{
+    if (faceIndex < 0 || faceIndex >= m_faces.size()
+        || !std::isfinite(distance) || distance < 1.0e-4
+        || distance > 1.0e6) {
+        return false;
+    }
+
+    const QVector<int> boundary = m_faces.at(faceIndex);
+    if (boundary.size() < 3
+        || m_vertices.size() + boundary.size() > kMaximumVertices
+        || m_faces.size() + boundary.size() > kMaximumFaces) {
+        return false;
+    }
+
+    qint64 currentRenderedVertices = 0;
+    for (const QVector<int> &face : m_faces)
+        currentRenderedVertices += static_cast<qint64>(face.size() - 2) * 3;
+    const qint64 projectedRenderedVertices =
+        currentRenderedVertices + static_cast<qint64>(boundary.size()) * 6;
+    if (projectedRenderedVertices > kMaximumRenderedVertices)
+        return false;
+
+    const QVector3D normal = normalForFace(boundary);
+    const QVector3D origin = m_vertices.at(boundary.first());
+    const QVector3D firstEdge = m_vertices.at(boundary.at(1)) - origin;
+    if (normal.lengthSquared() < kEpsilon * kEpsilon
+        || firstEdge.lengthSquared() < kEpsilon * kEpsilon) {
+        return false;
+    }
+
+    const QVector3D axisU = firstEdge.normalized();
+    const QVector3D axisV = QVector3D::crossProduct(normal, axisU).normalized();
+    QVector<QVector2D> polygon;
+    polygon.reserve(boundary.size());
+    for (const int vertexIndex : boundary) {
+        const QVector3D relative = m_vertices.at(vertexIndex) - origin;
+        polygon.append(QVector2D(QVector3D::dotProduct(relative, axisU),
+                                 QVector3D::dotProduct(relative, axisV)));
+    }
+
+    auto cross2d = [](const QVector2D &a, const QVector2D &b) {
+        return a.x() * b.y() - a.y() * b.x();
+    };
+
+    double signedAreaTwice = 0.0;
+    for (int i = 0; i < polygon.size(); ++i)
+        signedAreaTwice += cross2d(polygon.at(i), polygon.at((i + 1) % polygon.size()));
+
+    if (!std::isfinite(signedAreaTwice) || std::abs(signedAreaTwice) < 1.0e-5)
+        return false;
+    const float winding = signedAreaTwice > 0 ? 1.0f : -1.0f;
+
+    // This first inset operation is intentionally limited to strictly convex
+    // planar faces; self-crossing inset loops are rejected rather than saved.
+    for (int i = 0; i < polygon.size(); ++i) {
+        const QVector2D incoming = polygon.at(i) - polygon.at((i + polygon.size() - 1) % polygon.size());
+        const QVector2D outgoing = polygon.at((i + 1) % polygon.size()) - polygon.at(i);
+        if (incoming.lengthSquared() < kEpsilon * kEpsilon
+            || outgoing.lengthSquared() < kEpsilon * kEpsilon
+            || cross2d(incoming, outgoing) * winding <= 1.0e-5f) {
+            return false;
+        }
+    }
+
+    QVector<QVector2D> inwardNormals;
+    inwardNormals.reserve(polygon.size());
+    for (int i = 0; i < polygon.size(); ++i) {
+        const QVector2D edge = polygon.at((i + 1) % polygon.size()) - polygon.at(i);
+        QVector2D inward(-edge.y(), edge.x());
+        inward.normalize();
+        inwardNormals.append(inward * winding);
+    }
+
+    QVector<int> insetIndices;
+    insetIndices.reserve(boundary.size());
+    QVector<QVector2D> insetPolygon;
+    insetPolygon.reserve(boundary.size());
+
+    const float insetDistance = static_cast<float>(distance);
+    for (int i = 0; i < polygon.size(); ++i) {
+        const int previous = (i + polygon.size() - 1) % polygon.size();
+        const QVector2D pointA = polygon.at(i) + inwardNormals.at(previous) * insetDistance;
+        const QVector2D pointB = polygon.at(i) + inwardNormals.at(i) * insetDistance;
+        const QVector2D directionA = polygon.at(i) - polygon.at(previous);
+        const QVector2D directionB = polygon.at((i + 1) % polygon.size()) - polygon.at(i);
+        const float denominator = cross2d(directionA, directionB);
+
+        if (std::abs(denominator) < kEpsilon)
+            return false;
+
+        const float parameter = cross2d(pointB - pointA, directionB) / denominator;
+        const QVector2D insetPoint = pointA + directionA * parameter;
+        if (!std::isfinite(insetPoint.x()) || !std::isfinite(insetPoint.y()))
+            return false;
+
+        insetPolygon.append(insetPoint);
+        const QVector3D position = origin + axisU * insetPoint.x() + axisV * insetPoint.y();
+        if (!finiteVector(position)
+            || std::abs(position.x()) > 1.0e6f
+            || std::abs(position.y()) > 1.0e6f
+            || std::abs(position.z()) > 1.0e6f) {
+            return false;
+        }
+
+        insetIndices.append(m_vertices.size());
+        m_vertices.append(position);
+    }
+
+    double insetAreaTwice = 0.0;
+    for (int i = 0; i < insetPolygon.size(); ++i)
+        insetAreaTwice += cross2d(insetPolygon.at(i),
+                                  insetPolygon.at((i + 1) % insetPolygon.size()));
+
+    if (!std::isfinite(insetAreaTwice)
+        || insetAreaTwice * signedAreaTwice <= 0.0
+        || std::abs(insetAreaTwice) >= std::abs(signedAreaTwice)) {
+        // Roll back the temporary vertices: an excessive inset collapses or
+        // crosses the polygon, which is not a valid mesh-edit result.
+        m_vertices.resize(m_vertices.size() - boundary.size());
+        return false;
+    }
+
+    // The outer cap becomes an inner cap. Side faces bridge the old boundary
+    // to the inset loop, preserving manifold connectivity for convex faces.
+    m_faces[faceIndex] = insetIndices;
+    for (int i = 0; i < boundary.size(); ++i) {
+        const int next = (i + 1) % boundary.size();
+        m_faces.append(QVector<int>{
+            boundary.at(i),
+            boundary.at(next),
+            insetIndices.at(next),
+            insetIndices.at(i)
+        });
     }
 
     rebuildGeometry();
