@@ -1,0 +1,22 @@
+# CMake output
+/build/
+/cmake-build-*/
+/CMakeFiles/
+/CMakeCache.txt
+/cmake_install.cmake
+/Makefile
+
+# Qt and IDE output
+/.qt/
+/.qtc_clangd/
+/.vscode/
+*.user
+*.qmlc
+*.jsc
+
+# Platform and packaging output
+/dist/
+/release/
+/debug/
+*.app
+*.dSYM/
