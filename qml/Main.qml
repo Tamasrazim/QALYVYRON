@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick3D
+import QtQuick3D.Helpers
 import QtQuick.Dialogs
 
 ApplicationWindow {
@@ -27,6 +28,10 @@ ApplicationWindow {
     property real orbitYaw: 34
     property real orbitPitch: 23
     property real orbitDistance: 470
+    property real gizmoX: 0
+    property real gizmoY: 0
+    property real gizmoDepth: 1
+    property bool gizmoVisible: false
 
     ListModel {
         id: objectList
@@ -55,6 +60,22 @@ ApplicationWindow {
             horizontal * Math.cos(yaw)
         )
         camera.lookAt(focusTarget)
+        Qt.callLater(root.updateGizmo)
+    }
+
+    function updateGizmo() {
+        if (!view3d || !selectedObject) {
+            gizmoVisible = false
+            return
+        }
+
+        const projected = view3d.mapFrom3DScene(selectedObject.position)
+        gizmoX = projected.x
+        gizmoY = projected.y
+        gizmoDepth = projected.z
+        gizmoVisible = projected.z >= 0
+                       && projected.x >= 38 && projected.x <= view3d.width - 38
+                       && projected.y >= 38 && projected.y <= view3d.height - 38
     }
 
     function selectObject(objectId) {
@@ -76,6 +97,7 @@ ApplicationWindow {
         }
 
         refreshInspector()
+        Qt.callLater(root.updateGizmo)
     }
 
     function refreshInspector() {
@@ -206,6 +228,7 @@ ApplicationWindow {
         }
 
         refreshInspector()
+        Qt.callLater(root.updateGizmo)
     }
 
     function setMaterialColorByIndex(index) {
@@ -784,6 +807,111 @@ ApplicationWindow {
                                 root.orbitDistance = Math.max(190, Math.min(1050,
                                     root.orbitDistance - event.angleDelta.y * 0.35))
                                 root.updateCamera()
+                            }
+                        }
+
+                        Item {
+                            id: transformGizmo
+                            visible: root.selectedObject !== null && root.gizmoVisible
+                            x: root.gizmoX - width / 2
+                            y: root.gizmoY - height / 2
+                            z: 20
+                            width: 76
+                            height: 76
+
+                            Rectangle {
+                                x: 12
+                                y: parent.height / 2 - 1
+                                width: parent.width - 24
+                                height: 2
+                                color: "#d6d6d6"
+                                opacity: 0.9
+                            }
+                            Rectangle {
+                                x: parent.width / 2 - 1
+                                y: 12
+                                width: 2
+                                height: parent.height - 24
+                                color: "#d6d6d6"
+                                opacity: 0.9
+                            }
+                            Rectangle {
+                                anchors.centerIn: parent
+                                width: 15
+                                height: 15
+                                radius: 8
+                                color: "#f4f4f4"
+                                border.color: "#111111"
+                                border.width: 2
+                            }
+                            Rectangle {
+                                x: parent.width - 18
+                                y: parent.height / 2 - 5
+                                width: 10
+                                height: 10
+                                radius: 5
+                                color: "#aaaaaa"
+                                border.color: "#111111"
+                                border.width: 1
+                            }
+                            Rectangle {
+                                x: parent.width / 2 - 5
+                                y: 8
+                                width: 10
+                                height: 10
+                                radius: 5
+                                color: "#aaaaaa"
+                                border.color: "#111111"
+                                border.width: 1
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                acceptedButtons: Qt.LeftButton
+                                cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                                property var dragObject: null
+                                property var initialObjectPosition: Qt.vector3d(0, 0, 0)
+                                property var initialPointerPosition: Qt.vector3d(0, 0, 0)
+
+                                onPressed: function(mouse) {
+                                    dragObject = root.selectedObject
+                                    if (!dragObject)
+                                        return
+                                    initialObjectPosition = dragObject.position
+                                    initialPointerPosition = view3d.mapTo3DScene(Qt.vector3d(
+                                        transformGizmo.x + mouse.x,
+                                        transformGizmo.y + mouse.y,
+                                        root.gizmoDepth
+                                    ))
+                                }
+
+                                onPositionChanged: function(mouse) {
+                                    if (!pressed || !dragObject)
+                                        return
+                                    const pointer = view3d.mapTo3DScene(Qt.vector3d(
+                                        transformGizmo.x + mouse.x,
+                                        transformGizmo.y + mouse.y,
+                                        root.gizmoDepth
+                                    ))
+                                    const start = initialObjectPosition
+                                    const pointerStart = initialPointerPosition
+                                    dragObject.position = Qt.vector3d(
+                                        start.x + pointer.x - pointerStart.x,
+                                        start.y + pointer.y - pointerStart.y,
+                                        start.z + pointer.z - pointerStart.z
+                                    )
+                                    if (root.selectedIndex >= 0) {
+                                        objectList.setProperty(root.selectedIndex, "x", dragObject.position.x)
+                                        objectList.setProperty(root.selectedIndex, "y", dragObject.position.y)
+                                        objectList.setProperty(root.selectedIndex, "z", dragObject.position.z)
+                                    }
+                                    root.refreshInspector()
+                                }
+
+                                onReleased: {
+                                    dragObject = null
+                                    root.updateGizmo()
+                                }
                             }
                         }
 
