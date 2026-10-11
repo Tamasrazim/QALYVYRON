@@ -13,6 +13,8 @@ set(CMAKE_AUTOMOC ON)
 include(CTest)
 
 find_package(Qt6 6.4 REQUIRED COMPONENTS
+    Core
+    Gui
     Quick
     QuickControls2
     Quick3D
@@ -37,9 +39,14 @@ qt_add_qml_module(QALYVYRON
     VERSION 1.0
     QML_FILES
         qml/Main.qml
+    SOURCES
+        include/editablegeometry.h
+        src/editablegeometry.cpp
 )
 
 target_link_libraries(QALYVYRON PRIVATE
+    Qt6::Core
+    Qt6::Gui
     Qt6::Quick
     Qt6::QuickControls2
     Qt6::Quick3D
@@ -64,4 +71,19 @@ if(BUILD_TESTING)
     target_include_directories(qalyvyron_projectio_tests PRIVATE include)
     target_link_libraries(qalyvyron_projectio_tests PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME ProjectIOTests COMMAND qalyvyron_projectio_tests)
+
+    qt_add_executable(qalyvyron_geometry_tests
+        tests/test_editablegeometry.cpp
+        src/editablegeometry.cpp
+        include/editablegeometry.h
+    )
+    target_include_directories(qalyvyron_geometry_tests PRIVATE include)
+    target_link_libraries(qalyvyron_geometry_tests PRIVATE
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Quick
+        Qt6::Quick3D
+        Qt6::Test
+    )
+    add_test(NAME EditableGeometryTests COMMAND qalyvyron_geometry_tests)
 endif()
