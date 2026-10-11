@@ -41,7 +41,7 @@ ApplicationWindow {
         if (shape === "Sphere") return "#Sphere"
         if (shape === "Cylinder") return "#Cylinder"
         if (shape === "Cone") return "#Cone"
-        if (shape === "Plane") return "#Plane"
+        if (shape === "Plane") return "#Rectangle"
         return "#Cube"
     }
 
@@ -698,7 +698,7 @@ ApplicationWindow {
                                 }
 
                                 Model {
-                                    source: "#Plane"
+                                    source: "#Rectangle"
                                     position: Qt.vector3d(0, -65, 0)
                                     eulerRotation: Qt.vector3d(-90, 0, 0)
                                     scale: Qt.vector3d(12, 12, 12)
