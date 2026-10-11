@@ -1,4 +1,5 @@
 #include "projectio.h"
+#include "finalrenderer.h"
 
 #include <QCoreApplication>
 #include <QGuiApplication>
@@ -17,8 +18,10 @@ int main(int argc, char *argv[])
     QQuickStyle::setStyle(QStringLiteral("Basic"));
 
     ProjectIO projectIO;
+    FinalRenderer finalRenderer;
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty(QStringLiteral("projectIO"), &projectIO);
+    engine.rootContext()->setContextProperty(QStringLiteral("finalRenderer"), &finalRenderer);
 
     QObject::connect(
         &engine,
