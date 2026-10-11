@@ -463,10 +463,26 @@ ApplicationWindow {
             return
         }
 
-        // The spinner ranges are bound to meshChanged notifications.
-        // Do not assign to their "to" properties here, which would break those bindings.
         refreshMeshEditFields()
         setStatus("Extruded face and updated mesh topology.")
+    }
+
+    function insetSelectedFace() {
+        const geometry = selectedEditableGeometry()
+        const distance = Number(extrudeDistanceField.text)
+        if (!geometry || !Number.isFinite(distance) || distance <= 0) {
+            setStatus("Choose a built-in mesh and a positive inset distance.")
+            return
+        }
+
+        pushUndoSnapshot()
+        if (!geometry.insetFace(faceIndexSpinner.value, distance)) {
+            setStatus("Inset failed. Use a smaller distance on a convex, planar face.")
+            return
+        }
+
+        refreshMeshEditFields()
+        setStatus("Inset face and updated mesh topology.")
     }
 
     function updateTransform(axis, inputText) {
@@ -967,7 +983,7 @@ ApplicationWindow {
                 }
 
                 Text {
-                    text: "FACE EXTRUSION"
+                    text: "FACE TOOLS"
                     color: "#bcbcbc"
                     font.pixelSize: 10
                     font.bold: true
@@ -1013,11 +1029,16 @@ ApplicationWindow {
                         enabled: root.selectedObject !== null && !root.selectedObject.editorImported
                         onClicked: root.extrudeSelectedFace()
                     }
+                    Button {
+                        text: "Inset Face"
+                        enabled: root.selectedObject !== null && !root.selectedObject.editorImported
+                        onClicked: root.insetSelectedFace()
+                    }
                 }
 
                 Text {
                     Layout.fillWidth: true
-                    text: "This is the first mesh-editing toolset: direct vertex coordinates and face extrusion. Vertex/edge/face picking, bevel, inset, merge and full edit-mode tools are still under development."
+                    text: "Click the viewport markers to choose a vertex or face. This early toolset supports vertex coordinates, face extrusion, and inset on convex planar faces. Edge selection, bevel, merge, and advanced Edit Mode tools are still under development."
                     color: "#777777"
                     font.pixelSize: 10
                     wrapMode: Text.WordWrap
