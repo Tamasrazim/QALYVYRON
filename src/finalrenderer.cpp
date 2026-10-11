@@ -578,21 +578,70 @@ QVector3D directLighting(const Ray &ray,
     return radiance;
 }
 
-QVector3D traceRay(const Ray &ray,
-                   const SceneAccelerator &scene,
-                   const QVector3D &directionalLight,
-                   float keyBrightness,
-                   const QVector3D &pointLightPosition,
-                   float fillBrightness,
-                   const QVector3D &fillTint,
-                   const QVector3D &background)
+QVector3D tracePath(const Ray &primaryRay,
+                    const SceneAccelerator &scene,
+                    const QVector3D &directionalLight,
+                    float keyBrightness,
+                    const QVector3D &pointLightPosition,
+                    float fillBrightness,
+                    const QVector3D &fillTint,
+                    const QVector3D &background,
+                    int maxDiffuseBounces,
+                    std::mt19937 &random,
+                    std::uniform_real_distribution<float> &unitRandom)
 {
-    Hit hit;
-    if (!scene.closestHit(ray, &hit))
-        return background;
+    Ray ray = primaryRay;
+    QVector3D throughput(1.0f, 1.0f, 1.0f);
+    QVector3D radiance;
+    for (int bounce = 0; ; ++bounce) {
+        Hit hit;
+        if (!scene.closestHit(ray, &hit)) {
+            radiance += componentMultiply(throughput, background);
+            break;
+        }
 
-    return directLighting(ray, hit, scene, directionalLight, keyBrightness,
-                          pointLightPosition, fillBrightness, fillTint);
+        radiance += componentMultiply(
+            throughput,
+            directLighting(ray, hit, scene, directionalLight, keyBrightness,
+                           pointLightPosition, fillBrightness, fillTint));
+
+        if (bounce >= maxDiffuseBounces)
+            break;
+
+        // Cosine-weighted hemisphere sampling gives the diffuse BRDF's cosine
+        // term directly in its probability density. Throughput therefore only
+        // needs the surface albedo at each bounce.
+        const Triangle &surface = scene.triangle(hit.triangleIndex);
+        const float u1 = unitRandom(random);
+        const float u2 = unitRandom(random);
+        const float radius = std::sqrt(u1);
+        const float angle = 2.0f * kPi * u2;
+        const float localX = radius * std::cos(angle);
+        const float localY = radius * std::sin(angle);
+        const float localZ = std::sqrt(std::max(0.0f, 1.0f - u1));
+
+        const QVector3D helper = std::abs(hit.normal.x()) < 0.7f
+            ? QVector3D(1.0f, 0.0f, 0.0f)
+            : QVector3D(0.0f, 1.0f, 0.0f);
+        const QVector3D tangent = QVector3D::crossProduct(helper, hit.normal).normalized();
+        const QVector3D bitangent = QVector3D::crossProduct(hit.normal, tangent).normalized();
+        const QVector3D bounceDirection =
+            (tangent * localX + bitangent * localY + hit.normal * localZ).normalized();
+
+        throughput = componentMultiply(throughput, surface.albedo);
+        if (bounce >= 1) {
+            const float survival = std::clamp(
+                std::max({throughput.x(), throughput.y(), throughput.z()}),
+                0.1f, 0.95f);
+            if (unitRandom(random) >= survival)
+                break;
+            throughput /= survival;
+        }
+
+        ray.origin = hit.position + hit.normal * kRayEpsilon;
+        ray.direction = bounceDirection;
+    }
+    return radiance;
 }
 
 QRgb encodePixel(const QVector3D &linearColor)
@@ -641,7 +690,8 @@ bool FinalRenderer::startRender(const QUrl &outputUrl,
                                 const QVariantMap &scene,
                                 int width,
                                 int height,
-                                int samplesPerPixel)
+                                int samplesPerPixel,
+                                int maxDiffuseBounces)
 {
     if (m_busy.load()) {
         setWorkerStatus(QStringLiteral("A render is already running."));
@@ -667,8 +717,12 @@ bool FinalRenderer::startRender(const QUrl &outputUrl,
         setWorkerStatus(QStringLiteral("Samples per pixel must be between 1 and 64."));
         return false;
     }
-    if (pixels * samplesPerPixel > 268435456LL) {
-        setWorkerStatus(QStringLiteral("That resolution/sample combination exceeds the 268-million-ray budget. Lower the sample count or output resolution."));
+    if (maxDiffuseBounces < 0 || maxDiffuseBounces > 4) {
+        setWorkerStatus(QStringLiteral("Diffuse bounce depth must be between 0 and 4."));
+        return false;
+    }
+    if (pixels * samplesPerPixel * (maxDiffuseBounces + 1LL) > 268435456LL) {
+        setWorkerStatus(QStringLiteral("That resolution/sample/bounce combination exceeds the 268-million-ray budget. Lower the sample count, bounce depth, or output resolution."));
         return false;
     }
 
@@ -679,8 +733,9 @@ bool FinalRenderer::startRender(const QUrl &outputUrl,
     setWorkerStatus(QStringLiteral("Preparing offline render…"));
 
     const QString outputPath = outputUrl.toLocalFile();
-    m_worker = std::thread([this, outputPath, scene, width, height, samplesPerPixel]() {
-        runRender(outputPath, scene, width, height, samplesPerPixel);
+    m_worker = std::thread([this, outputPath, scene, width, height,
+                            samplesPerPixel, maxDiffuseBounces]() {
+        runRender(outputPath, scene, width, height, samplesPerPixel, maxDiffuseBounces);
     });
     return true;
 }
@@ -712,7 +767,8 @@ void FinalRenderer::runRender(QString outputPath,
                               QVariantMap scene,
                               int width,
                               int height,
-                              int samplesPerPixel)
+                              int samplesPerPixel,
+                              int maxDiffuseBounces)
 {
     auto finish = [this](bool success, const QString &message) {
         setWorkerStatus(message);
@@ -787,8 +843,8 @@ void FinalRenderer::runRender(QString outputPath,
             return;
         }
 
-        setWorkerStatus(QStringLiteral("Rendering %1×%2 at %3 sample(s) per pixel…")
-                            .arg(width).arg(height).arg(samplesPerPixel));
+        setWorkerStatus(QStringLiteral("Rendering %1×%2 at %3 sample(s)/pixel and %4 diffuse bounce(s)…")
+                            .arg(width).arg(height).arg(samplesPerPixel).arg(maxDiffuseBounces));
         std::mt19937 random(0x51414c59U);
         std::uniform_real_distribution<float> jitter(0.0f, 1.0f);
 
@@ -810,9 +866,10 @@ void FinalRenderer::runRender(QString outputPath,
                     const QVector3D direction =
                         (forward + right * imageX + up * imageY).normalized();
                     const Ray ray{cameraPosition, direction};
-                    accumulated += traceRay(ray, accelerator, directionalLight,
-                                            keyBrightness, pointLightPosition,
-                                            fillBrightness, fillTint, background);
+                    accumulated += tracePath(ray, accelerator, directionalLight,
+                                             keyBrightness, pointLightPosition,
+                                             fillBrightness, fillTint, background,
+                                             maxDiffuseBounces, random, jitter);
                 }
 
                 row[x] = encodePixel(accumulated / static_cast<float>(samplesPerPixel));
@@ -852,9 +909,9 @@ void FinalRenderer::runRender(QString outputPath,
             return;
         }
 
-        finish(true, QStringLiteral("Render saved: %1 (%2×%3, %4 sample(s)/pixel)")
+        finish(true, QStringLiteral("Render saved: %1 (%2×%3, %4 sample(s)/pixel, %5 diffuse bounce(s))")
                          .arg(QFileInfo(outputPath).absoluteFilePath())
-                         .arg(width).arg(height).arg(samplesPerPixel));
+                         .arg(width).arg(height).arg(samplesPerPixel).arg(maxDiffuseBounces));
     } catch (const std::exception &exception) {
         finish(false, QStringLiteral("Render failed: %1")
                           .arg(QString::fromUtf8(exception.what())));
