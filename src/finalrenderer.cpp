@@ -525,7 +525,8 @@ QVector3D directLighting(const Ray &ray,
                          const QVector3D &directionalLight,
                          float keyBrightness,
                          const QVector3D &pointLightPosition,
-                         float fillBrightness)
+                         float fillBrightness,
+                         const QVector3D &fillTint)
 {
     const Triangle &triangle = scene.triangle(hit.triangleIndex);
     const QVector3D albedo = triangle.albedo;
@@ -536,6 +537,7 @@ QVector3D directLighting(const Ray &ray,
     QVector3D radiance = albedo * 0.075f;
 
     auto applyLight = [&](const QVector3D &lightDirection,
+                          const QVector3D &lightColor,
                           float intensity,
                           float shadowDistance) {
         const float diffuse = std::max(0.0f,
@@ -547,7 +549,7 @@ QVector3D directLighting(const Ray &ray,
         if (scene.occluded(shadowRay, shadowDistance))
             return;
 
-        radiance += albedo * (intensity * diffuse);
+        radiance += componentMultiply(albedo, lightColor) * (intensity * diffuse);
 
         const QVector3D viewDirection = -ray.direction;
         const QVector3D halfDirection = (lightDirection + viewDirection).normalized();
@@ -555,10 +557,11 @@ QVector3D directLighting(const Ray &ray,
         const float specular = std::pow(std::max(0.0f,
             QVector3D::dotProduct(hit.normal, halfDirection)), specularPower)
             * (1.0f - roughness) * intensity * 0.12f;
-        radiance += QVector3D(specular, specular, specular);
+        radiance += componentMultiply(QVector3D(specular, specular, specular), lightColor);
     };
 
-    applyLight(directionalLight, 0.78f * keyBrightness,
+    applyLight(directionalLight, QVector3D(1, 1, 1),
+               0.78f * keyBrightness,
                std::numeric_limits<float>::infinity());
 
     const QVector3D toPointLight = pointLightPosition - hit.position;
@@ -568,7 +571,8 @@ QVector3D directLighting(const Ray &ray,
         const QVector3D direction = toPointLight / distance;
         const float attenuation = (fillBrightness / 65.0f)
             / (1.0f + 0.00008f * distanceSquared);
-        applyLight(direction, 0.80f * attenuation, distance - kRayEpsilon);
+        applyLight(direction, fillTint, 0.80f * attenuation,
+                   distance - kRayEpsilon);
     }
 
     return radiance;
@@ -580,6 +584,7 @@ QVector3D traceRay(const Ray &ray,
                    float keyBrightness,
                    const QVector3D &pointLightPosition,
                    float fillBrightness,
+                   const QVector3D &fillTint,
                    const QVector3D &background)
 {
     Hit hit;
@@ -587,7 +592,7 @@ QVector3D traceRay(const Ray &ray,
         return background;
 
     return directLighting(ray, hit, scene, directionalLight, keyBrightness,
-                          pointLightPosition, fillBrightness);
+                          pointLightPosition, fillBrightness, fillTint);
 }
 
 QRgb encodePixel(const QVector3D &linearColor)
@@ -660,6 +665,10 @@ bool FinalRenderer::startRender(const QUrl &outputUrl,
 
     if (samplesPerPixel < 1 || samplesPerPixel > 64) {
         setWorkerStatus(QStringLiteral("Samples per pixel must be between 1 and 64."));
+        return false;
+    }
+    if (pixels * samplesPerPixel > 268435456LL) {
+        setWorkerStatus(QStringLiteral("That resolution/sample combination exceeds the 268-million-ray budget. Lower the sample count or output resolution."));
         return false;
     }
 
@@ -763,6 +772,13 @@ void FinalRenderer::runRender(QString outputPath,
         const float fillBrightness = static_cast<float>(std::clamp(
             numberOr(settings, QStringLiteral("fillLightBrightness"), 65.0), 0.0, 150.0));
         const QVector3D pointLightPosition(-160.0f, 190.0f, 140.0f);
+        const int fillTintIndex = static_cast<int>(std::clamp(
+            numberOr(settings, QStringLiteral("fillTintIndex"), 0.0), 0.0, 2.0));
+        const QVector3D fillTint = fillTintIndex == 1
+            ? colorToLinear(QColor(QStringLiteral("#ffd6ad")))
+            : fillTintIndex == 2
+                ? colorToLinear(QColor(QStringLiteral("#b8d6ff")))
+                : QVector3D(1.0f, 1.0f, 1.0f);
         const QVector3D background = colorToLinear(QColor(QStringLiteral("#171717")));
 
         QImage image(width, height, QImage::Format_ARGB32);
@@ -796,7 +812,7 @@ void FinalRenderer::runRender(QString outputPath,
                     const Ray ray{cameraPosition, direction};
                     accumulated += traceRay(ray, accelerator, directionalLight,
                                             keyBrightness, pointLightPosition,
-                                            fillBrightness, background);
+                                            fillBrightness, fillTint, background);
                 }
 
                 row[x] = encodePixel(accumulated / static_cast<float>(samplesPerPixel));
