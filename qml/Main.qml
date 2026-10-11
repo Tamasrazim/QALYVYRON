@@ -1300,7 +1300,6 @@ ApplicationWindow {
                             }
 
                             root.pushUndoSnapshot()
-                            root.pushUndoSnapshot()
                             root.selectedObject.editorLabel = newName
                             objectList.setProperty(root.selectedIndex, "label", newName)
                             root.setStatus("Renamed object to " + newName + ".")
