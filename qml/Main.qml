@@ -767,6 +767,46 @@ ApplicationWindow {
                     metalness: 0.08
                 }
             ]
+
+            // Selection markers live in the model's local space, so they follow
+            // its transform instead of drifting when the object is moved/rotated.
+            Model {
+                source: "#Sphere"
+                visible: root.meshEditDialog.visible
+                         && root.selectedObject === editableModel
+                         && editableModel.geometry
+                         && editableModel.geometry.vertexCount > 0
+                position: editableModel.geometry
+                          ? editableModel.geometry.vertexPosition(root.vertexIndexSpinner.value)
+                          : Qt.vector3d(0, 0, 0)
+                scale: Qt.vector3d(0.10, 0.10, 0.10)
+                pickable: false
+                materials: [
+                    PrincipledMaterial {
+                        baseColor: "#ffffff"
+                        roughness: 0.25
+                    }
+                ]
+            }
+
+            Model {
+                source: "#Sphere"
+                visible: root.meshEditDialog.visible
+                         && root.selectedObject === editableModel
+                         && editableModel.geometry
+                         && editableModel.geometry.faceCount > 0
+                position: editableModel.geometry
+                          ? editableModel.geometry.faceCenter(root.faceIndexSpinner.value)
+                          : Qt.vector3d(0, 0, 0)
+                scale: Qt.vector3d(0.13, 0.13, 0.13)
+                pickable: false
+                materials: [
+                    PrincipledMaterial {
+                        baseColor: "#777777"
+                        roughness: 0.45
+                    }
+                ]
+            }
         }
     }
 
