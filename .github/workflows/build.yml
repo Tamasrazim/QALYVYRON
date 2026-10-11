@@ -19,7 +19,7 @@ jobs:
         uses: jurplel/install-qt-action@v4.3.1
         with:
           version: 6.8.3
-          modules: qtquick3d qtquickdialogs2
+          modules: qtquick3d
           cache: true
 
       - name: Configure
