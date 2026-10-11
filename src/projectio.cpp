@@ -15,6 +15,7 @@
 #include <QVector3D>
 
 #include <cmath>
+#include <utility>
 
 namespace
 {
