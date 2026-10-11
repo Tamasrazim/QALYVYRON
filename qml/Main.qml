@@ -5,6 +5,7 @@ import QtQuick3D
 import QtQuick3D.Helpers
 import QtQuick3D.AssetUtils
 import QtQuick.Dialogs
+import Qalyvyron
 
 ApplicationWindow {
     id: root
@@ -240,6 +241,7 @@ ApplicationWindow {
             editorShape: shape,
             editorColor: colorValue,
             editorRoughness: roughness,
+            editorMeshData: saved.mesh || ({}),
             uniformScale: uniformScale,
             position: Qt.vector3d(x, y, z),
             eulerRotation: Qt.vector3d(rx, ry, rz),
@@ -337,6 +339,97 @@ ApplicationWindow {
         setStatus("Importing " + label + "…")
     }
 
+    function selectedEditableGeometry() {
+        if (!selectedObject || selectedObject.editorImported)
+            return null
+        return selectedObject.geometry
+    }
+
+    function refreshMeshEditFields() {
+        const geometry = selectedEditableGeometry()
+        if (!geometry)
+            return
+
+        const vertex = geometry.vertexPosition(vertexIndexSpinner.value)
+        vertexXField.text = Number(vertex.x).toFixed(3)
+        vertexYField.text = Number(vertex.y).toFixed(3)
+        vertexZField.text = Number(vertex.z).toFixed(3)
+        meshVertexCountLabel.text = String(geometry.vertexCount) + " vertices"
+        meshFaceCountLabel.text = String(geometry.faceCount) + " faces"
+
+        if (faceIndexSpinner.value < geometry.faceCount) {
+            const center = geometry.faceCenter(faceIndexSpinner.value)
+            const normal = geometry.faceNormal(faceIndexSpinner.value)
+            faceInfoLabel.text = "Center  " + center.x.toFixed(2) + ", "
+                + center.y.toFixed(2) + ", " + center.z.toFixed(2)
+                + "\\nNormal  " + normal.x.toFixed(2) + ", "
+                + normal.y.toFixed(2) + ", " + normal.z.toFixed(2)
+        } else {
+            faceInfoLabel.text = "No face selected."
+        }
+    }
+
+    function openMeshEditor() {
+        const geometry = selectedEditableGeometry()
+        if (!geometry) {
+            setStatus("Select a built-in mesh object first.")
+            return
+        }
+        vertexIndexSpinner.value = Math.min(vertexIndexSpinner.value, geometry.vertexCount - 1)
+        faceIndexSpinner.value = Math.min(faceIndexSpinner.value, geometry.faceCount - 1)
+        refreshMeshEditFields()
+        meshEditDialog.open()
+    }
+
+    function updateMeshVertex(axis, inputText) {
+        const geometry = selectedEditableGeometry()
+        if (!geometry)
+            return
+
+        const value = Number(inputText)
+        if (!Number.isFinite(value) || Math.abs(value) > 1000000) {
+            refreshMeshEditFields()
+            setStatus("Enter a finite vertex coordinate between -1,000,000 and 1,000,000.")
+            return
+        }
+
+        const current = geometry.vertexPosition(vertexIndexSpinner.value)
+        let x = current.x
+        let y = current.y
+        let z = current.z
+        if (axis === "x") x = value
+        else if (axis === "y") y = value
+        else if (axis === "z") z = value
+
+        pushUndoSnapshot()
+        if (!geometry.setVertexPosition(vertexIndexSpinner.value, Qt.vector3d(x, y, z))) {
+            setStatus("The vertex update was rejected.")
+            return
+        }
+        refreshMeshEditFields()
+        setStatus("Updated vertex " + vertexIndexSpinner.value + ".")
+    }
+
+    function extrudeSelectedFace() {
+        const geometry = selectedEditableGeometry()
+        const distance = Number(extrudeDistanceField.text)
+        if (!geometry || !Number.isFinite(distance)) {
+            setStatus("Select a built-in mesh and enter a valid extrusion distance.")
+            return
+        }
+
+        pushUndoSnapshot()
+        if (!geometry.extrudeFace(faceIndexSpinner.value, distance)) {
+            setStatus("Face extrusion failed. Choose a valid face and a non-zero distance.")
+            return
+        }
+
+        faceIndexSpinner.to = Math.max(0, geometry.faceCount - 1)
+        vertexIndexSpinner.to = Math.max(0, geometry.vertexCount - 1)
+        refreshMeshEditFields()
+        setStatus("Extruded face and updated mesh topology.")
+    }
+
     function updateTransform(axis, inputText) {
         if (!selectedObject || selectedIndex < 0)
             return
@@ -425,10 +518,12 @@ ApplicationWindow {
             color: row.color,
             roughness: row.roughness
         }
-        if (row.kind === "asset")
+        if (row.kind === "asset") {
             addImportedAsset(row.source, copy)
-        else
+        } else {
+            copy.mesh = selectedObject.geometry.serializeMesh()
             addPrimitive(row.shape, copy)
+        }
     }
 
     function removeSelected() {
@@ -489,6 +584,16 @@ ApplicationWindow {
         setStatus("New scene ready.")
     }
 
+    function meshDataForObject(objectId) {
+        for (let i = 0; i < sceneObjects.length; ++i) {
+            const object = sceneObjects[i]
+            if (object && object.editorId === objectId && !object.editorImported
+                    && object.geometry && typeof object.geometry.serializeMesh === "function")
+                return object.geometry.serializeMesh()
+        }
+        return null
+    }
+
     function serializeScene() {
         const serializedObjects = []
         for (let i = 0; i < objectList.count; ++i) {
@@ -499,6 +604,7 @@ ApplicationWindow {
                 shape: row.shape,
                 kind: row.kind || "primitive",
                 source: row.source || "",
+                mesh: row.kind === "asset" ? null : meshDataForObject(row.objectId),
                 x: row.x, y: row.y, z: row.z,
                 rx: row.rx, ry: row.ry, rz: row.rz,
                 scale: row.scale,
@@ -638,8 +744,19 @@ ApplicationWindow {
             property color editorColor: "#c8c8c8"
             property real editorRoughness: 0.38
             property real uniformScale: 1.0
+            property var editorMeshData: ({})
 
-            source: root.meshSource(editorShape)
+            geometry: EditableGeometry {
+                id: editableGeometry
+                shape: editableModel.editorShape
+                Component.onCompleted: {
+                    const savedMesh = editableModel.editorMeshData
+                    if (savedMesh && Object.keys(savedMesh).length > 0
+                            && !loadMesh(savedMesh)) {
+                        root.setStatus("Saved mesh data was invalid; the base primitive was loaded.")
+                    }
+                }
+            }
             pickable: true
             materials: [
                 PrincipledMaterial {
@@ -649,6 +766,179 @@ ApplicationWindow {
                 }
             ]
         }
+    }
+
+    Dialog {
+        id: meshEditDialog
+        title: "Edit Mesh"
+        modal: true
+        focus: true
+        width: 560
+        height: 540
+        anchors.centerIn: parent
+        standardButtons: Dialog.Close
+
+        contentItem: ScrollView {
+            clip: true
+            ColumnLayout {
+                width: parent.width
+                spacing: 13
+
+                Text {
+                    Layout.fillWidth: true
+                    text: root.selectedObject ? root.selectedObject.editorLabel : "No object selected"
+                    color: root.mainText
+                    font.pixelSize: 16
+                    font.bold: true
+                    wrapMode: Text.WordWrap
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Text {
+                        id: meshVertexCountLabel
+                        text: "0 vertices"
+                        color: root.secondaryText
+                        font.pixelSize: 11
+                    }
+                    Item { Layout.fillWidth: true }
+                    Text {
+                        id: meshFaceCountLabel
+                        text: "0 faces"
+                        color: root.secondaryText
+                        font.pixelSize: 11
+                    }
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 1
+                    color: root.borderColor
+                }
+
+                Text {
+                    text: "VERTEX POSITION"
+                    color: "#bcbcbc"
+                    font.pixelSize: 10
+                    font.bold: true
+                    font.letterSpacing: 1.2
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Text { text: "Vertex"; color: root.secondaryText; font.pixelSize: 11 }
+                    SpinBox {
+                        id: vertexIndexSpinner
+                        from: 0
+                        to: Math.max(0, root.selectedObject && !root.selectedObject.editorImported
+                                      ? root.selectedObject.geometry.vertexCount - 1 : 0)
+                        editable: true
+                        onValueChanged: if (meshEditDialog.visible) root.refreshMeshEditFields()
+                    }
+                    Item { Layout.fillWidth: true }
+                }
+
+                GridLayout {
+                    Layout.fillWidth: true
+                    columns: 2
+                    columnSpacing: 12
+                    rowSpacing: 7
+
+                    Text { text: "X"; color: root.secondaryText; font.pixelSize: 11 }
+                    TextField {
+                        id: vertexXField
+                        Layout.fillWidth: true
+                        text: "0"
+                        selectByMouse: true
+                        validator: DoubleValidator { }
+                        onEditingFinished: root.updateMeshVertex("x", text)
+                    }
+                    Text { text: "Y"; color: root.secondaryText; font.pixelSize: 11 }
+                    TextField {
+                        id: vertexYField
+                        Layout.fillWidth: true
+                        text: "0"
+                        selectByMouse: true
+                        validator: DoubleValidator { }
+                        onEditingFinished: root.updateMeshVertex("y", text)
+                    }
+                    Text { text: "Z"; color: root.secondaryText; font.pixelSize: 11 }
+                    TextField {
+                        id: vertexZField
+                        Layout.fillWidth: true
+                        text: "0"
+                        selectByMouse: true
+                        validator: DoubleValidator { }
+                        onEditingFinished: root.updateMeshVertex("z", text)
+                    }
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 1
+                    color: root.borderColor
+                }
+
+                Text {
+                    text: "FACE EXTRUSION"
+                    color: "#bcbcbc"
+                    font.pixelSize: 10
+                    font.bold: true
+                    font.letterSpacing: 1.2
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Text { text: "Face index"; color: root.secondaryText; font.pixelSize: 11 }
+                    SpinBox {
+                        id: faceIndexSpinner
+                        from: 0
+                        to: Math.max(0, root.selectedObject && !root.selectedObject.editorImported
+                                      ? root.selectedObject.geometry.faceCount - 1 : 0)
+                        editable: true
+                        onValueChanged: if (meshEditDialog.visible) root.refreshMeshEditFields()
+                    }
+                    Item { Layout.fillWidth: true }
+                }
+
+                Text {
+                    id: faceInfoLabel
+                    Layout.fillWidth: true
+                    text: "Select a face to inspect its center and normal."
+                    color: root.secondaryText
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Text { text: "Distance"; color: root.secondaryText; font.pixelSize: 11 }
+                    TextField {
+                        id: extrudeDistanceField
+                        Layout.preferredWidth: 130
+                        text: "25"
+                        selectByMouse: true
+                        validator: DoubleValidator { bottom: -1000000; top: 1000000 }
+                    }
+                    Item { Layout.fillWidth: true }
+                    Button {
+                        text: "Extrude Face"
+                        enabled: root.selectedObject !== null && !root.selectedObject.editorImported
+                        onClicked: root.extrudeSelectedFace()
+                    }
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    text: "This is the first mesh-editing toolset: direct vertex coordinates and face extrusion. Vertex/edge/face picking, bevel, inset, merge and full edit-mode tools are still under development."
+                    color: "#777777"
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+            }
+        }
+
+        onOpened: Qt.callLater(root.refreshMeshEditFields)
     }
 
     FileDialog {
@@ -952,6 +1242,14 @@ ApplicationWindow {
                             color: "#666666"
                             font.pixelSize: 11
                         }
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        text: "Edit Selected Mesh"
+                        enabled: root.selectedIndex >= 0 && root.selectedObject !== null
+                                 && !root.selectedObject.editorImported
+                        onClicked: root.openMeshEditor()
                     }
 
                     Button {
