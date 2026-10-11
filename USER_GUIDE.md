@@ -36,9 +36,12 @@ Choose **Import 3D Asset** and select a local:
 - glTF 2.0 JSON: `.gltf`
 - Wavefront OBJ: `.obj`
 
-The initial importer uses Qt Quick 3D's runtime loader. Imported objects appear in the hierarchy and can be moved, rotated, scaled, duplicated, saved as a scene reference, and previewed.
+OBJ and glTF use different import paths:
 
-**Important:** this version stores the local URL of the source asset, rather than copying the source mesh and its dependent textures into the project. Keep the source asset (and any files it depends on) at the same location when reopening the scene. Automatic asset collection and portable project folders are planned. Imported materials are preserved, but the inspector cannot edit them yet.
+- **Wavefront OBJ:** QALYVYRON parses the vertex positions and polygon faces into its own editable mesh data. The imported geometry is embedded in the `.qvscene` file, so the original OBJ is no longer needed to reopen that mesh. It can be edited through **Edit Selected Mesh** and written back out through **Export OBJ**.
+- **glTF 2.0 (.glb/.gltf):** loaded by Qt Quick 3D's runtime loader for preview and placement. This path remains read-only and stores the source file's local URL. Keep the source file and its dependent assets in the same location when reopening the scene.
+
+The current OBJ importer is geometry-only. It does not yet preserve texture coordinates, imported normals, MTL material libraries, or textures. Full material/texture preservation and asset collection are still planned.
 
 ## Materials, lights, and camera
 
@@ -50,8 +53,9 @@ Use the **Undo** and **Redo** buttons in the toolbar. The current implementation
 
 ## Save, reopen, and export
 
-- **Save:** writes a validated `.qvscene` project.
+- **Save:** writes a validated `.qvscene` project, including embedded editable OBJ geometry and mesh edits.
 - **Open:** reads a supported QALYVYRON scene file.
+- **Export OBJ:** writes editable mesh objects to a Wavefront OBJ file and bakes object position, rotation, and scale into the output vertices. Read-only glTF runtime-loaded objects are skipped with a warning.
 - **Export Preview:** writes a PNG of the live viewport.
 
 The PNG is only the current viewport image. It is not an offline/path-traced final render, and it should not be used as evidence of a final-render engine. A separate final-render system is a major roadmap item.
