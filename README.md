@@ -1,49 +1,72 @@
 # QALYVYRON
 
-**A visual-first 3D creation and rendering studio.**
+**An independent, visual-first 3D creation studio built to become a practical Blender alternative.**
 
-QALYVYRON is an independent desktop application project focused on making 3D creation discoverable: select objects, drag handles, customize materials and lighting in visible panels, and preview the result without needing to memorize keyboard shortcuts.
+QALYVYRON is being developed as a local desktop tool for creating, editing, animating, and rendering 3D work without requiring Blender, a paid subscription, or a cloud account. The goal is not to imitate Blender's interface; it is to provide a workflow that is easier to discover, mouse-friendly by default, and capable of finishing real projects.
 
-The long-term goal is a complete 3D workflow with scene editing, materials, lighting, cameras, animation, project files, and high-quality rendering. The repository is an early foundation; capabilities will be marked complete only after they are implemented and tested.
+**Status: active prototype — not yet a drop-in Blender replacement.** The current build covers the first scene-workspace foundations. It does not yet have full polygon modeling, a final offline renderer, a complete animation system, or production asset export. Those gaps are explicit work items, not features that this repository claims to have finished.
+
+## Current prototype capabilities
+
+- Interactive 3D viewport with orbit, zoom, selection, and a reference grid.
+- Cube, sphere, cylinder, cone, and plane scene objects.
+- Object hierarchy, renaming, duplication, deletion, and direct transform editing.
+- Material base-color palette and roughness for the built-in primitive objects.
+- Camera field-of-view and key/fill-light controls.
+- Versioned `.qvscene` project files with local save/open validation.
+- Undo and redo history for common scene, transform, material, camera, and light edits.
+- Initial import path for local glTF 2.0 (`.glb`, `.gltf`) and Wavefront OBJ (`.obj`) files. Imported asset materials are preserved, but not yet editable in the inspector.
+- PNG export of the viewport preview. **This is not a final offline render.**
+
+Imported assets are linked by their local file URL. Keep those source files at the same location when reopening a project on this early build; automatic asset collection and portable project packaging are still planned.
+
+## What must be built before it can replace Blender for daily work
+
+The major remaining systems are real mesh-edit mode (vertex, edge and face operations), reliable import and export, UV and texture workflows, a node-based material system, a production-quality offline renderer, animation and timeline tools, render queues, and a complete Windows installer. The acceptance criteria live in [ROADMAP.md](ROADMAP.md).
+
+The rule for the project is simple: **a control is not considered implemented just because it appears in the interface.** It must perform the advertised work and be tested. Builds and file-format limits should be documented honestly.
 
 ## Product principles
 
-- **Visual-first:** core actions are available through visible controls; shortcuts are optional accelerators.
-- **Independent:** no Blender installation, runtime, or background process is required.
-- **Real 3D:** scenes use 3D objects, cameras, materials, and lights rather than fake 2D mockups.
-- **Progressive complexity:** approachable defaults first, advanced controls when needed.
-- **Honest output:** preview quality and export limitations are clearly identified.
-- **Native projects:** save and reopen scenes with a versioned, documented format.
-- **Monochrome interface:** restrained black, white, and grayscale UI; scene colors remain unrestricted.
+- **Visual-first:** important actions are available through visible controls; shortcuts are optional.
+- **Independent:** no Blender installation, Blender runtime, account, subscription, or cloud service is required.
+- **Offline-first:** projects and rendering are intended to work locally.
+- **Actual 3D:** use real geometry, cameras, materials and lights instead of 2D mockups.
+- **Progressive complexity:** simple defaults first, deeper controls as the workflow grows.
+- **Honest output:** preview quality and final-render quality are clearly separated.
+- **Monochrome interface:** black, white and grayscale UI; scene content can use any colors.
+- **Recoverable editing:** project validation, bounded undo/redo, and tests are part of the product, not optional polish.
 
-## Planned workflow
+## Technology
 
-1. Create a scene and add primitive objects.
-2. Select objects directly in the viewport and adjust transforms visually.
-3. Customize materials and lighting through the inspector.
-4. Frame the scene with a camera and preview it.
-5. Save/reopen the project and export an image.
-6. Expand the core with mesh editing, asset import, animation, and higher-quality rendering.
+The desktop application uses C++17, Qt 6, Qt Quick 3D and QML. Qt Quick 3D provides the current real-time viewport; the long-term architecture must add a dedicated modeling data layer and a final-render backend instead of treating a viewport screenshot as a rendered image.
 
-## Technology direction
+The application does not use Blender as a library or launch Blender in the background.
 
-The initial desktop prototype uses **C++ with Qt 6 and Qt Quick 3D** for the interface and interactive 3D viewport. This provides a native application foundation without depending on Blender. The rendering architecture will remain modular so the project can grow beyond the initial viewport renderer.
+## Build from source
 
-## Build
+A Qt 6 development installation with Quick, Quick Controls, Quick Dialogs, Quick 3D, and Shader Tools is required.
 
-A Qt 6 development environment with Quick, Quick Controls, Quick Dialogs, Quick 3D, and Shader Tools is required. On Ubuntu 24.04, install `qt6-base-dev`, `qt6-declarative-dev`, `qt6-quick3d-dev`, `qt6-quick3d-dev-tools`, and `qt6-shadertools-dev`. Ubuntu 24.04 provides a matching Qt 6.4 toolchain for the current CI build.
+On Ubuntu 24.04, install the current CI toolchain:
 
-    cmake -S . -B build
-    cmake --build build --config Release
+```sh
+sudo apt-get update
+sudo apt-get install --no-install-recommends cmake ninja-build g++ \
+  qt6-base-dev qt6-declarative-dev qt6-quick3d-dev \
+  qt6-quick3d-dev-tools qt6-shadertools-dev
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel 2
+ctest --test-dir build --output-on-failure
+```
 
-The exact Qt components and supported platforms will be documented as the prototype and CI matrix mature.
+The CI workflow validates Linux builds and is being extended to produce a portable Windows x64 package. A downloadable package is only considered usable once the Windows job has passed; a successful C++ build alone does not prove the QML application works on every GPU.
 
-## Development status
+## Repository files
 
-**Stage 0 — Repository foundation.** The project structure and initial application prototype are being established. This is not yet a production-ready replacement for Blender.
-
-See [ROADMAP.md](ROADMAP.md) for planned milestones and [CONTRIBUTING.md](CONTRIBUTING.md) for development expectations.
+- [ROADMAP.md](ROADMAP.md) — milestone plan and the requirements for a practical Blender alternative.
+- [CONTRIBUTING.md](CONTRIBUTING.md) — build and development expectations.
+- [USER_GUIDE.md](USER_GUIDE.md) — current prototype controls and known limitations.
 
 ## License
 
-No license has been granted yet. Until a license file is added, all rights are reserved by the copyright holder; do not assume the source is open for reuse or redistribution.
+No license has been granted yet. All rights are reserved by the copyright holder until a license file is added; do not assume the source is open for reuse or redistribution.
