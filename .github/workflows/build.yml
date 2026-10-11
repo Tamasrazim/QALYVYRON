@@ -8,8 +8,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: qalyvyron-build-${{ github.ref }}
-  cancel-in-progress: true
+  group: qalyvyron-build-${{ github.sha }}
+  cancel-in-progress: false
 
 jobs:
   linux-qt-build:
