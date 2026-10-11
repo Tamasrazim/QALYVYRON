@@ -2141,7 +2141,7 @@ ApplicationWindow {
                             id: capabilityText
                             anchors.fill: parent
                             anchors.margins: 10
-                            text: "CURRENT BUILD\nPrimitive objects • transforms • base color • roughness • scene files • viewport preview export"
+                            text: "CURRENT BUILD\nEditable polygon meshes • indexed vertex editing • face extrusion • OBJ import/export • materials • transforms • scene files • viewport preview"
                             color: "#999999"
                             font.pixelSize: 10
                             lineHeight: 1.25
