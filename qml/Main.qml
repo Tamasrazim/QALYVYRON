@@ -762,28 +762,80 @@ ApplicationWindow {
                             property real lastX: 0
                             property real lastY: 0
                             property bool orbiting: false
-                            cursorShape: orbiting ? Qt.ClosedHandCursor : Qt.ArrowCursor
+                            property bool movingSelection: false
+                            property real selectionDepth: 1
+                            property var movingObject: null
+                            property var dragStartPosition: Qt.vector3d(0, 0, 0)
+                            property var dragStartPoint: Qt.vector3d(0, 0, 0)
+                            cursorShape: orbiting ? Qt.ClosedHandCursor : movingSelection ? Qt.SizeAllCursor : Qt.ArrowCursor
 
                             onPressed: function(mouse) {
                                 lastX = mouse.x
                                 lastY = mouse.y
                                 orbiting = mouse.button === Qt.RightButton
+                                movingSelection = false
+                                movingObject = null
+
+                                if (mouse.button !== Qt.LeftButton)
+                                    return
+
+                                const hit = view3d.pick(mouse.x, mouse.y)
+                                if (hit.objectHit && hit.objectHit.editorId) {
+                                    root.selectObject(hit.objectHit.editorId)
+                                    movingObject = root.selectedObject
+                                    if (movingObject) {
+                                        const projected = view3d.mapFrom3DScene(movingObject.position)
+                                        selectionDepth = Math.max(1, projected.z)
+                                        dragStartPosition = movingObject.position
+                                        dragStartPoint = view3d.mapTo3DScene(
+                                            Qt.vector3d(mouse.x, mouse.y, selectionDepth))
+                                        movingSelection = true
+                                    }
+                                }
                             }
 
                             onPositionChanged: function(mouse) {
-                                if (!pressed || !orbiting)
+                                if (!pressed)
                                     return
 
-                                const dx = mouse.x - lastX
-                                const dy = mouse.y - lastY
-                                lastX = mouse.x
-                                lastY = mouse.y
-                                root.orbitYaw -= dx * 0.45
-                                root.orbitPitch = Math.max(-80, Math.min(80, root.orbitPitch + dy * 0.35))
-                                root.updateCamera()
+                                if (orbiting) {
+                                    const dx = mouse.x - lastX
+                                    const dy = mouse.y - lastY
+                                    lastX = mouse.x
+                                    lastY = mouse.y
+                                    root.orbitYaw -= dx * 0.45
+                                    root.orbitPitch = Math.max(-80, Math.min(80, root.orbitPitch + dy * 0.35))
+                                    root.updateCamera()
+                                    return
+                                }
+
+                                if (!movingSelection || !movingObject)
+                                    return
+
+                                const point = view3d.mapTo3DScene(
+                                    Qt.vector3d(mouse.x, mouse.y, selectionDepth))
+                                const start = dragStartPosition
+                                const anchor = dragStartPoint
+                                movingObject.position = Qt.vector3d(
+                                    start.x + point.x - anchor.x,
+                                    start.y + point.y - anchor.y,
+                                    start.z + point.z - anchor.z
+                                )
+
+                                if (root.selectedIndex >= 0) {
+                                    objectList.setProperty(root.selectedIndex, "x", movingObject.position.x)
+                                    objectList.setProperty(root.selectedIndex, "y", movingObject.position.y)
+                                    objectList.setProperty(root.selectedIndex, "z", movingObject.position.z)
+                                    root.refreshInspector()
+                                }
                             }
 
-                            onReleased: orbiting = false
+                            onReleased: {
+                                orbiting = false
+                                movingSelection = false
+                                movingObject = null
+                                Qt.callLater(root.updateGizmo)
+                            }
 
                             onClicked: function(mouse) {
                                 if (mouse.button !== Qt.LeftButton)
