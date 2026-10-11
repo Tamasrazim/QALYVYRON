@@ -146,14 +146,16 @@ ApplicationWindow {
             nextObjectNumber += 1
 
         const label = saved.label ? String(saved.label) : shape + " " + objectId.replace("object-", "")
-        const x = Number(saved.x) || 0
-        const y = Number(saved.y) || 0
-        const z = Number(saved.z) || 0
+        const x = saved.x !== undefined ? Number(saved.x) : objectList.count * 120
+        const y = saved.y !== undefined ? Number(saved.y) : 0
+        const z = saved.z !== undefined ? Number(saved.z) : 0
         const rx = Number(saved.rx) || 0
         const ry = Number(saved.ry) || 0
         const rz = Number(saved.rz) || 0
         const uniformScale = Number(saved.scale) > 0 ? Number(saved.scale) : 1
-        const colorValue = saved.color ? String(saved.color) : "#c8c8c8"
+        const defaultColors = ["#c8c8c8", "#508bdc", "#d8ae57", "#df5b57", "#f2f2f2"]
+        const defaultColor = defaultColors[objectList.count % defaultColors.length]
+        const colorValue = saved.color ? String(saved.color) : defaultColor
         const roughness = saved.roughness !== undefined ? Math.max(0, Math.min(1, Number(saved.roughness))) : 0.38
 
         const object = primitiveComponent.createObject(sceneRoot, {
@@ -549,6 +551,11 @@ ApplicationWindow {
                             text: "+ Cone"
                             onClicked: root.addPrimitive("Cone")
                         }
+                        Button {
+                            Layout.fillWidth: true
+                            text: "+ Plane"
+                            onClicked: root.addPrimitive("Plane")
+                        }
                     }
 
                     Rectangle {
@@ -739,12 +746,14 @@ ApplicationWindow {
                             }
 
                             DirectionalLight {
+                                id: keyLight
                                 eulerRotation: Qt.vector3d(-42, -35, 0)
                                 brightness: 1.7
                                 castsShadow: true
                             }
 
                             PointLight {
+                                id: fillLight
                                 position: Qt.vector3d(-160, 190, 140)
                                 brightness: 65
                                 color: "#ffffff"
@@ -1262,6 +1271,96 @@ ApplicationWindow {
                         color: "#6f6f6f"
                         font.pixelSize: 10
                         wrapMode: Text.WordWrap
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        height: 1
+                        color: root.borderColor
+                    }
+
+                    Text {
+                        text: "LIGHTING"
+                        color: "#bcbcbc"
+                        font.pixelSize: 10
+                        font.bold: true
+                        font.letterSpacing: 1.3
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Text { text: "Key light"; color: root.secondaryText; font.pixelSize: 10 }
+                        Item { Layout.fillWidth: true }
+                        Text { text: Number(keyLight.brightness).toFixed(1); color: "#cecece"; font.pixelSize: 10 }
+                    }
+
+                    Slider {
+                        id: keyBrightnessSlider
+                        Layout.fillWidth: true
+                        from: 0
+                        to: 4
+                        value: keyLight.brightness
+                        onMoved: keyLight.brightness = value
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Text { text: "Fill light"; color: root.secondaryText; font.pixelSize: 10 }
+                        Item { Layout.fillWidth: true }
+                        Text { text: Number(fillLight.brightness).toFixed(0); color: "#cecece"; font.pixelSize: 10 }
+                    }
+
+                    Slider {
+                        id: fillBrightnessSlider
+                        Layout.fillWidth: true
+                        from: 0
+                        to: 150
+                        value: fillLight.brightness
+                        onMoved: fillLight.brightness = value
+                    }
+
+                    ComboBox {
+                        id: fillTintCombo
+                        Layout.fillWidth: true
+                        model: ["Neutral fill", "Warm fill", "Cool fill"]
+                        onActivated: {
+                            if (currentIndex === 0)
+                                fillLight.color = "#ffffff"
+                            else if (currentIndex === 1)
+                                fillLight.color = "#ffd6ad"
+                            else
+                                fillLight.color = "#b8d6ff"
+                        }
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        height: 1
+                        color: root.borderColor
+                    }
+
+                    Text {
+                        text: "CAMERA"
+                        color: "#bcbcbc"
+                        font.pixelSize: 10
+                        font.bold: true
+                        font.letterSpacing: 1.3
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Text { text: "Field of view"; color: root.secondaryText; font.pixelSize: 10 }
+                        Item { Layout.fillWidth: true }
+                        Text { text: Number(camera.fieldOfView).toFixed(0) + "°"; color: "#cecece"; font.pixelSize: 10 }
+                    }
+
+                    Slider {
+                        id: cameraFovSlider
+                        Layout.fillWidth: true
+                        from: 25
+                        to: 80
+                        value: camera.fieldOfView
+                        onMoved: camera.fieldOfView = value
                     }
 
                     Item { Layout.fillHeight: true }
