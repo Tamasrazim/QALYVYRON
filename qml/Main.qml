@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick3D
 import QtQuick3D.Helpers
+import QtQuick3D.AssetUtils
 import QtQuick.Dialogs
 
 ApplicationWindow {
@@ -141,6 +142,16 @@ ApplicationWindow {
                        && projected.y >= 38 && projected.y <= view3d.height - 38
     }
 
+    function editorIdFromObject(hitObject) {
+        let candidate = hitObject
+        while (candidate) {
+            if (candidate.editorId !== undefined && String(candidate.editorId).length > 0)
+                return String(candidate.editorId)
+            candidate = candidate.parent
+        }
+        return ""
+    }
+
     function selectObject(objectId) {
         selectedIndex = -1
         selectedObject = null
@@ -246,6 +257,8 @@ ApplicationWindow {
             objectId: objectId,
             label: label,
             shape: shape,
+            kind: "primitive",
+            source: "",
             x: x, y: y, z: z,
             rx: rx, ry: ry, rz: rz,
             scale: uniformScale,
@@ -254,6 +267,74 @@ ApplicationWindow {
         })
         selectObject(objectId)
         setStatus("Created " + label + ".")
+    }
+
+    function createImportedAsset(sourceUrl) {
+        pushUndoSnapshot()
+        addImportedAsset(sourceUrl)
+    }
+
+    function addImportedAsset(sourceUrl, savedData) {
+        const saved = savedData || ({})
+        const sourceText = saved.source ? String(saved.source) : String(sourceUrl || "")
+        if (!/^file:/i.test(sourceText)) {
+            setStatus("Choose a local .glb, .gltf, or .obj file.")
+            return
+        }
+        if (!/\.(glb|gltf|obj)$/i.test(sourceText.split(/[?#]/)[0])) {
+            setStatus("Supported imports are glTF 2.0 (.glb/.gltf) and Wavefront OBJ (.obj).")
+            return
+        }
+
+        const objectId = saved.id ? String(saved.id) : "object-" + nextObjectNumber++
+        const numericSuffix = Number(objectId.replace("object-", ""))
+        if (Number.isFinite(numericSuffix) && numericSuffix >= nextObjectNumber)
+            nextObjectNumber = numericSuffix + 1
+
+        const label = saved.label ? String(saved.label) : "Imported Asset " + objectId.replace("object-", "")
+        const x = saved.x !== undefined ? Number(saved.x) : objectList.count * 120
+        const y = saved.y !== undefined ? Number(saved.y) : 0
+        const z = saved.z !== undefined ? Number(saved.z) : 0
+        const rx = Number(saved.rx) || 0
+        const ry = Number(saved.ry) || 0
+        const rz = Number(saved.rz) || 0
+        const uniformScale = Number(saved.scale) > 0 ? Number(saved.scale) : 1
+
+        const object = importedAssetComponent.createObject(sceneRoot, {
+            editorId: objectId,
+            editorLabel: label,
+            editorShape: "Imported Asset",
+            editorImported: true,
+            editorColor: "#c8c8c8",
+            editorRoughness: 0.38,
+            uniformScale: uniformScale,
+            assetUrl: sourceText,
+            position: Qt.vector3d(x, y, z),
+            eulerRotation: Qt.vector3d(rx, ry, rz),
+            scale: Qt.vector3d(uniformScale, uniformScale, uniformScale),
+            objectName: objectId
+        })
+
+        if (!object) {
+            setStatus("Could not create an imported-asset entry.")
+            return
+        }
+
+        sceneObjects.push(object)
+        objectList.append({
+            objectId: objectId,
+            label: label,
+            shape: "Imported Asset",
+            kind: "asset",
+            source: sourceText,
+            x: x, y: y, z: z,
+            rx: rx, ry: ry, rz: rz,
+            scale: uniformScale,
+            color: "#c8c8c8",
+            roughness: 0.38
+        })
+        selectObject(objectId)
+        setStatus("Importing " + label + "…")
     }
 
     function updateTransform(axis, inputText) {
@@ -304,6 +385,9 @@ ApplicationWindow {
             return
 
         pushUndoSnapshot()
+        if (selectedObject.editorImported)
+            return
+
         const palette = ["#c8c8c8", "#f2f2f2", "#555555", "#df5b57", "#508bdc", "#d8ae57"]
         const colorValue = palette[Math.max(0, Math.min(palette.length - 1, index))]
         selectedObject.editorColor = colorValue
@@ -313,6 +397,9 @@ ApplicationWindow {
 
     function setMaterialRoughness(value) {
         if (!selectedObject || selectedIndex < 0)
+            return
+
+        if (selectedObject.editorImported)
             return
 
         const roughness = Math.max(0, Math.min(1, value))
@@ -326,7 +413,7 @@ ApplicationWindow {
 
         pushUndoSnapshot()
         const row = objectList.get(selectedIndex)
-        addPrimitive(row.shape, {
+        const copy = {
             label: row.label + " Copy",
             x: row.x + 125,
             y: row.y,
@@ -337,7 +424,11 @@ ApplicationWindow {
             scale: row.scale,
             color: row.color,
             roughness: row.roughness
-        })
+        }
+        if (row.kind === "asset")
+            addImportedAsset(row.source, copy)
+        else
+            addPrimitive(row.shape, copy)
     }
 
     function removeSelected() {
@@ -406,6 +497,8 @@ ApplicationWindow {
                 id: row.objectId,
                 label: row.label,
                 shape: row.shape,
+                kind: row.kind || "primitive",
+                source: row.source || "",
                 x: row.x, y: row.y, z: row.z,
                 rx: row.rx, ry: row.ry, rz: row.rz,
                 scale: row.scale,
@@ -473,6 +566,10 @@ ApplicationWindow {
         const savedObjects = document.objects || []
         for (let i = 0; i < savedObjects.length; ++i) {
             const entry = savedObjects[i]
+            if (entry.kind === "asset" && entry.source) {
+                addImportedAsset(entry.source, entry)
+                continue
+            }
             const shape = ["Cube", "Sphere", "Cylinder", "Cone", "Plane"].indexOf(entry.shape) >= 0
                          ? entry.shape : "Cube"
             addPrimitive(shape, entry)
@@ -504,6 +601,33 @@ ApplicationWindow {
     }
 
     Component {
+        id: importedAssetComponent
+
+        Node {
+            id: importedRoot
+            property string editorId: ""
+            property string editorLabel: "Imported Asset"
+            property string editorShape: "Imported Asset"
+            property bool editorImported: true
+            property color editorColor: "#c8c8c8"
+            property real editorRoughness: 0.38
+            property real uniformScale: 1.0
+            property url assetUrl: ""
+
+            RuntimeLoader {
+                id: runtimeAssetLoader
+                source: importedRoot.assetUrl
+                onStatusChanged: {
+                    if (status === RuntimeLoader.Error)
+                        root.setStatus("Asset import failed: " + errorString)
+                    else if (status === RuntimeLoader.Success)
+                        root.setStatus("Imported " + importedRoot.editorLabel + ".")
+                }
+            }
+        }
+    }
+
+    Component {
         id: primitiveComponent
 
         Model {
@@ -525,6 +649,20 @@ ApplicationWindow {
                 }
             ]
         }
+    }
+
+    FileDialog {
+        id: importAssetDialog
+        title: "Import 3D Asset"
+        fileMode: FileDialog.OpenFile
+        nameFilters: [
+            "Supported 3D assets (*.glb *.gltf *.obj)",
+            "glTF binary (*.glb)",
+            "glTF scenes (*.gltf)",
+            "Wavefront OBJ (*.obj)"
+        ]
+
+        onAccepted: root.createImportedAsset(selectedFile)
     }
 
     FileDialog {
@@ -712,6 +850,20 @@ ApplicationWindow {
                             text: "+ Plane"
                             onClicked: root.createPrimitive("Plane")
                         }
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        text: "Import 3D Asset"
+                        onClicked: importAssetDialog.open()
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: "Imports local GLB, glTF 2.0 and OBJ files."
+                        color: "#707070"
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
                     }
 
                     Rectangle {
@@ -957,8 +1109,9 @@ ApplicationWindow {
                                     return
 
                                 const hit = view3d.pick(mouse.x, mouse.y)
-                                if (hit.objectHit && hit.objectHit.editorId) {
-                                    root.selectObject(hit.objectHit.editorId)
+                                const hitId = hit.objectHit ? root.editorIdFromObject(hit.objectHit) : ""
+                                if (hitId.length > 0) {
+                                    root.selectObject(hitId)
                                     movingObject = root.selectedObject
                                     if (movingObject) {
                                         const projected = view3d.mapFrom3DScene(movingObject.position)
@@ -1025,8 +1178,9 @@ ApplicationWindow {
                                     return
 
                                 const result = view3d.pick(mouse.x, mouse.y)
-                                if (result.objectHit && result.objectHit.editorId)
-                                    root.selectObject(result.objectHit.editorId)
+                                const hitId = result.objectHit ? root.editorIdFromObject(result.objectHit) : ""
+                                if (hitId.length > 0)
+                                    root.selectObject(hitId)
                                 else
                                     root.selectObject("")
                             }
@@ -1443,8 +1597,18 @@ ApplicationWindow {
                     ComboBox {
                         id: colorCombo
                         Layout.fillWidth: true
+                        enabled: root.selectedObject !== null && !root.selectedObject.editorImported
                         model: ["Silver", "White", "Graphite", "Red", "Blue", "Gold"]
                         onActivated: root.setMaterialColorByIndex(currentIndex)
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        visible: root.selectedObject !== null && root.selectedObject.editorImported
+                        text: "Imported asset materials are preserved from the source file. Direct material editing is not available yet."
+                        color: "#777777"
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
                     }
 
                     RowLayout {
@@ -1465,6 +1629,7 @@ ApplicationWindow {
                     Slider {
                         id: roughnessSlider
                         Layout.fillWidth: true
+                        enabled: root.selectedObject !== null && !root.selectedObject.editorImported
                         from: 0
                         to: 1
                         value: 0.38
