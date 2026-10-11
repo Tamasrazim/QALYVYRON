@@ -1,0 +1,54 @@
+# QALYVYRON — Prototype Guide
+
+This guide describes the current early build. It is not a claim that all Blender workflows are supported yet.
+
+## Start a scene
+
+The application opens with a cube and sphere. Use the **Create** panel to add a cube, sphere, cylinder, cone, or plane. Use **Scene Objects** to select an object, rename it in the inspector, duplicate it, or remove it.
+
+## Navigate the viewport
+
+- **Right mouse drag:** orbit the camera around the scene.
+- **Mouse wheel:** zoom in or out.
+- **Left click:** select an object.
+- **Left drag on an object:** move it in the scene.
+- **Front / Top / Side:** choose a useful view.
+- **Frame Scene:** return to the default framing.
+
+Use the inspector's numeric position, rotation, and scale fields when you need exact values. The transform gizmo is an early convenience control; axis-constrained movement is not yet implemented.
+
+## Import a 3D asset
+
+Choose **Import 3D Asset** and select a local:
+
+- glTF 2.0 binary: `.glb`
+- glTF 2.0 JSON: `.gltf`
+- Wavefront OBJ: `.obj`
+
+The initial importer uses Qt Quick 3D's runtime loader. Imported objects appear in the hierarchy and can be moved, rotated, scaled, duplicated, saved as a scene reference, and previewed.
+
+**Important:** this version stores the local URL of the source asset, rather than copying the source mesh and its dependent textures into the project. Keep the source asset (and any files it depends on) at the same location when reopening the scene. Automatic asset collection and portable project folders are planned. Imported materials are preserved, but the inspector cannot edit them yet.
+
+## Materials, lights, and camera
+
+For built-in primitive objects, the inspector offers a small base-color palette and roughness control. The key/fill lights and camera field of view can be adjusted through sliders. Imported-asset material controls are disabled where the current code cannot apply the edit reliably.
+
+## Undo and redo
+
+Use the **Undo** and **Redo** buttons in the toolbar. The current implementation keeps a bounded history of scene snapshots for common object, transform, material, camera, and light edits. Since this system is new, treat it as prototype functionality until it passes the full Windows runtime tests.
+
+## Save, reopen, and export
+
+- **Save:** writes a validated `.qvscene` project.
+- **Open:** reads a supported QALYVYRON scene file.
+- **Export Preview:** writes a PNG of the live viewport.
+
+The PNG is only the current viewport image. It is not an offline/path-traced final render, and it should not be used as evidence of a final-render engine. A separate final-render system is a major roadmap item.
+
+## Current limits
+
+There is no full vertex/edge/face modeling mode, extrusion/bevel/subdivision toolset, editable node-based material system, complete UV workflow, production offline renderer, animation timeline, rigging system, or finished installer yet. Do not move an important project away from its source assets or rely on the prototype as the only copy of valuable work. Keep backups while testing.
+
+## Report a reproducible issue
+
+Record the app version, Windows version, GPU/driver when known, file format, steps to reproduce, and any status-bar or application error. Use a copy of an asset rather than sharing a private or licensed source file.
