@@ -16,6 +16,8 @@ private slots:
     void insettingFaceAddsInnerCapAndRing();
     void invalidInsetIsAtomic();
     void deleteFaceRemovesSurfaceAndCompactsVertices();
+    void mergingAdjacentVerticesKeepsValidTopology();
+    void invalidVertexMergeIsAtomic();
     void invalidExtrusionIsRejected();
     void invalidMeshLoadLeavesCurrentMeshUntouched();
     void meshRoundTripsThroughVariantMap();
@@ -117,6 +119,41 @@ void EditableGeometryTests::deleteFaceRemovesSurfaceAndCompactsVertices()
 
     QVERIFY(!cube.deleteFace(-1));
     QVERIFY(!cube.deleteFace(cube.faceCount()));
+}
+
+void EditableGeometryTests::mergingAdjacentVerticesKeepsValidTopology()
+{
+    EditableGeometry geometry;
+    const QVector3D targetPosition = geometry.vertexPosition(1);
+
+    QVERIFY(geometry.mergeVertices(0, 1));
+    QCOMPARE(geometry.vertexCount(), 7);
+    QCOMPARE(geometry.faceCount(), 6);
+
+    for (int faceIndex = 0; faceIndex < geometry.faceCount(); ++faceIndex) {
+        const QVariantList corners = geometry.serializeMesh()
+            .value(QStringLiteral("faces")).toList().at(faceIndex).toList();
+        QVERIFY(corners.size() >= 3);
+        QVERIFY(geometry.faceNormal(faceIndex).length() > 0.9f);
+    }
+
+    bool retainedTarget = false;
+    for (int index = 0; index < geometry.vertexCount(); ++index) {
+        if (geometry.vertexPosition(index) == targetPosition)
+            retainedTarget = true;
+    }
+    QVERIFY(retainedTarget);
+}
+
+void EditableGeometryTests::invalidVertexMergeIsAtomic()
+{
+    EditableGeometry geometry;
+    const QVariantMap before = geometry.serializeMesh();
+
+    QVERIFY(!geometry.mergeVertices(-1, 0));
+    QVERIFY(!geometry.mergeVertices(0, geometry.vertexCount()));
+    QVERIFY(!geometry.mergeVertices(0, 0));
+    QCOMPARE(geometry.serializeMesh(), before);
 }
 
 void EditableGeometryTests::invalidExtrusionIsRejected()
