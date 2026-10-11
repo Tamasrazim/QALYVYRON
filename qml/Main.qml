@@ -772,12 +772,12 @@ ApplicationWindow {
             // its transform instead of drifting when the object is moved/rotated.
             Model {
                 source: "#Sphere"
-                visible: root.meshEditDialog.visible
+                visible: meshEditDialog.visible
                          && root.selectedObject === editableModel
                          && editableModel.geometry
                          && editableModel.geometry.vertexCount > 0
                 position: editableModel.geometry
-                          ? editableModel.geometry.vertexPosition(root.vertexIndexSpinner.value)
+                          ? editableModel.geometry.vertexPosition(vertexIndexSpinner.value)
                           : Qt.vector3d(0, 0, 0)
                 scale: Qt.vector3d(0.10, 0.10, 0.10)
                 pickable: false
@@ -791,12 +791,12 @@ ApplicationWindow {
 
             Model {
                 source: "#Sphere"
-                visible: root.meshEditDialog.visible
+                visible: meshEditDialog.visible
                          && root.selectedObject === editableModel
                          && editableModel.geometry
                          && editableModel.geometry.faceCount > 0
                 position: editableModel.geometry
-                          ? editableModel.geometry.faceCenter(root.faceIndexSpinner.value)
+                          ? editableModel.geometry.faceCenter(faceIndexSpinner.value)
                           : Qt.vector3d(0, 0, 0)
                 scale: Qt.vector3d(0.13, 0.13, 0.13)
                 pickable: false
@@ -817,7 +817,8 @@ ApplicationWindow {
         focus: true
         width: 560
         height: 540
-        anchors.centerIn: parent
+        x: (root.width - width) / 2
+        y: (root.height - height) / 2
         standardButtons: Dialog.Close
 
         contentItem: ScrollView {
