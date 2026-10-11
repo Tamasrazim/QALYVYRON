@@ -53,14 +53,15 @@ For built-in primitive objects, the inspector offers a small base-color palette 
 
 Use the **Undo** and **Redo** buttons in the toolbar. The current implementation keeps a bounded history of scene snapshots for common object, transform, material, camera, and light edits. Since this system is new, treat it as prototype functionality until it passes the full Windows runtime tests.
 
-## Save, reopen, and export
+## Final render, save, reopen, and export
 
+- **Render Image:** opens offline-render settings. Choose 720p, 1080p, 1440p, 4K, or 8K, select samples per pixel and diffuse-bounce depth, then choose a local PNG destination. Rendering runs on a worker thread with progress reporting and cancellation. The renderer uses actual scene geometry, directional/point lights, hard shadows, material colors/roughness, and diffuse indirect bounces. Resolution/sample/bounce combinations are capped to keep the render workload bounded.
 - **Save:** writes a validated `.qvscene` project, including embedded editable OBJ geometry and mesh edits.
 - **Open:** reads a supported QALYVYRON scene file.
 - **Export OBJ:** writes editable mesh objects to a Wavefront OBJ file and bakes object position, rotation, and scale into the output vertices. Read-only glTF runtime-loaded objects are skipped with a warning.
 - **Export Preview:** writes a PNG of the live viewport.
 
-The PNG is only the current viewport image. It is not an offline/path-traced final render, and it should not be used as evidence of a final-render engine. A separate final-render system is a major roadmap item.
+The preview PNG is the current viewport image. The **Render Image** command is the separate offline render path. The current renderer has hard shadows and simple diffuse indirect bounces; soft shadows, denoising, advanced PBR nodes, textures, and read-only GLB/glTF source geometry are not yet part of final rendering.
 
 ## Current limits
 
