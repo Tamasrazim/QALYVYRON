@@ -5,7 +5,7 @@ import QtQuick3D
 import QtQuick3D.Helpers
 import QtQuick3D.AssetUtils
 import QtQuick.Dialogs
-import Qalyvyron
+import Qalyvyron 1.0
 
 ApplicationWindow {
     id: root
