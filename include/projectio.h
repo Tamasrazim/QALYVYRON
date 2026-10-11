@@ -14,4 +14,7 @@ public:
     Q_INVOKABLE QVariantMap saveProject(const QUrl &url,
                                        const QVariantMap &document) const;
     Q_INVOKABLE QVariantMap loadProject(const QUrl &url) const;
+    Q_INVOKABLE QVariantMap importObj(const QUrl &url) const;
+    Q_INVOKABLE QVariantMap exportObj(const QUrl &url,
+                                      const QVariantMap &document) const;
 };
