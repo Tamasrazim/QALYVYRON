@@ -31,6 +31,7 @@ public:
     Q_INVOKABLE bool extrudeFace(int faceIndex, double distance);
     Q_INVOKABLE bool insetFace(int faceIndex, double distance);
     Q_INVOKABLE bool deleteFace(int faceIndex);
+    Q_INVOKABLE bool mergeVertices(int sourceIndex, int targetIndex);
     Q_INVOKABLE QVariantMap serializeMesh() const;
     Q_INVOKABLE bool loadMesh(const QVariantMap &data);
 
