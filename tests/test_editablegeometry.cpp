@@ -18,6 +18,8 @@ private slots:
     void deleteFaceRemovesSurfaceAndCompactsVertices();
     void mergingAdjacentVerticesKeepsValidTopology();
     void invalidVertexMergeIsAtomic();
+    void createFaceFillsDeletedCubeSurface();
+    void invalidFaceCreationDoesNotMutateMesh();
     void invalidExtrusionIsRejected();
     void invalidMeshLoadLeavesCurrentMeshUntouched();
     void meshRoundTripsThroughVariantMap();
@@ -153,6 +155,30 @@ void EditableGeometryTests::invalidVertexMergeIsAtomic()
     QVERIFY(!geometry.mergeVertices(-1, 0));
     QVERIFY(!geometry.mergeVertices(0, geometry.vertexCount()));
     QVERIFY(!geometry.mergeVertices(0, 0));
+    QCOMPARE(geometry.serializeMesh(), before);
+}
+
+void EditableGeometryTests::createFaceFillsDeletedCubeSurface()
+{
+    EditableGeometry geometry;
+    QVERIFY(geometry.deleteFace(0));
+    QCOMPARE(geometry.faceCount(), 5);
+
+    const QVariantList corners{4, 5, 6, 7};
+    QVERIFY(geometry.createFace(corners));
+    QCOMPARE(geometry.faceCount(), 6);
+    QCOMPARE(geometry.vertexCount(), 8);
+    QVERIFY(geometry.faceNormal(5).length() > 0.9f);
+}
+
+void EditableGeometryTests::invalidFaceCreationDoesNotMutateMesh()
+{
+    EditableGeometry geometry;
+    const QVariantMap before = geometry.serializeMesh();
+
+    QVERIFY(!geometry.createFace(QVariantList{0, 1}));
+    QVERIFY(!geometry.createFace(QVariantList{0, 1, 1}));
+    QVERIFY(!geometry.createFace(QVariantList{0, 1, 2, 99}));
     QCOMPARE(geometry.serializeMesh(), before);
 }
 
