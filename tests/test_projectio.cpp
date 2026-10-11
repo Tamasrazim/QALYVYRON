@@ -83,7 +83,7 @@ void ProjectIOTests::rejectsMalformedJson()
     const QString path = directory.filePath(QStringLiteral("broken.qvscene"));
     QFile file(path);
     QVERIFY(file.open(QIODevice::WriteOnly));
-    QCOMPARE(file.write("{ this is not JSON"), qint64(19));
+    QCOMPARE(file.write("{ this is not JSON"), qint64(18));
     file.close();
 
     ProjectIO io;
