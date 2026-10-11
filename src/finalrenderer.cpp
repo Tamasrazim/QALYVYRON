@@ -384,13 +384,14 @@ public:
             return false;
 
         bool found = false;
-        std::vector<int> pending;
-        pending.reserve(64);
-        pending.push_back(0);
+        // The BVH is balanced, so a fixed traversal stack avoids a heap
+        // allocation for every primary and shadow ray in high-resolution renders.
+        std::array<int, 128> pending{};
+        int pendingCount = 0;
+        pending[pendingCount++] = 0;
 
-        while (!pending.empty()) {
-            const int nodeIndex = pending.back();
-            pending.pop_back();
+        while (pendingCount > 0) {
+            const int nodeIndex = pending[--pendingCount];
             const BvhNode &node = nodes.at(nodeIndex);
             if (!intersectsBounds(ray, node.bounds, hit->distance))
                 continue;
@@ -416,8 +417,12 @@ public:
                     }
                 }
             } else {
-                pending.push_back(node.left);
-                pending.push_back(node.right);
+                // With a median-split BVH built from at most two million
+                // triangles, traversal depth is well below this fixed capacity.
+                if (pendingCount + 2 <= static_cast<int>(pending.size())) {
+                    pending[pendingCount++] = node.left;
+                    pending[pendingCount++] = node.right;
+                }
             }
         }
         return found;
@@ -428,12 +433,11 @@ public:
         if (nodes.empty())
             return false;
 
-        std::vector<int> pending;
-        pending.reserve(32);
-        pending.push_back(0);
-        while (!pending.empty()) {
-            const int nodeIndex = pending.back();
-            pending.pop_back();
+        std::array<int, 128> pending{};
+        int pendingCount = 0;
+        pending[pendingCount++] = 0;
+        while (pendingCount > 0) {
+            const int nodeIndex = pending[--pendingCount];
             const BvhNode &node = nodes.at(nodeIndex);
             if (!intersectsBounds(ray, node.bounds, maxDistance))
                 continue;
@@ -446,8 +450,10 @@ public:
                         return true;
                 }
             } else {
-                pending.push_back(node.left);
-                pending.push_back(node.right);
+                if (pendingCount + 2 <= static_cast<int>(pending.size())) {
+                    pending[pendingCount++] = node.left;
+                    pending[pendingCount++] = node.right;
+                }
             }
         }
         return false;
