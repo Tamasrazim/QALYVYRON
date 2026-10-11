@@ -502,6 +502,133 @@ bool EditableGeometry::mergeVertices(int sourceIndex, int targetIndex)
     return true;
 }
 
+bool EditableGeometry::createFace(const QVariantList &vertexIndices)
+{
+    const int cornerCount = vertexIndices.size();
+    if (cornerCount < 3 || cornerCount > kMaximumFaceCorners
+        || m_faces.size() >= kMaximumFaces) {
+        return false;
+    }
+
+    QVector<int> face;
+    face.reserve(cornerCount);
+    QSet<int> unique;
+    for (const QVariant &rawIndex : vertexIndices) {
+        bool converted = false;
+        const int index = rawIndex.toInt(&converted);
+        if (!converted || index < 0 || index >= m_vertices.size()
+            || unique.contains(index)) {
+            return false;
+        }
+        unique.insert(index);
+        face.append(index);
+    }
+
+    qint64 currentRenderedVertices = 0;
+    for (const QVector<int> &existing : m_faces)
+        currentRenderedVertices += static_cast<qint64>(existing.size() - 2) * 3;
+    currentRenderedVertices += static_cast<qint64>(cornerCount - 2) * 3;
+    if (currentRenderedVertices > kMaximumRenderedVertices)
+        return false;
+
+    const QVector3D normal = normalForFace(face);
+    if (!finiteVector(normal) || normal.lengthSquared() < kEpsilon * kEpsilon)
+        return false;
+
+    const QVector3D origin = m_vertices.at(face.first());
+    const QVector3D firstEdge = m_vertices.at(face.at(1)) - origin;
+    if (firstEdge.lengthSquared() < kEpsilon * kEpsilon)
+        return false;
+    const QVector3D axisU = firstEdge.normalized();
+    const QVector3D axisV = QVector3D::crossProduct(normal, axisU).normalized();
+
+    QVector<QVector2D> polygon;
+    polygon.reserve(cornerCount);
+    float coordinateExtent = 1.0f;
+    for (const int index : face) {
+        const QVector3D relative = m_vertices.at(index) - origin;
+        if (std::abs(QVector3D::dotProduct(relative, normal)) > 1.0e-2f)
+            return false; // This operation only adds planar polygon faces.
+
+        coordinateExtent = std::max(coordinateExtent, relative.length());
+        polygon.append(QVector2D(QVector3D::dotProduct(relative, axisU),
+                                 QVector3D::dotProduct(relative, axisV)));
+    }
+
+    const float epsilon = std::max(1.0e-5f, coordinateExtent * 1.0e-6f);
+    auto cross2d = [](const QVector2D &a, const QVector2D &b) {
+        return a.x() * b.y() - a.y() * b.x();
+    };
+    auto orientation = [&cross2d](const QVector2D &a,
+                                  const QVector2D &b,
+                                  const QVector2D &c) {
+        return cross2d(b - a, c - a);
+    };
+
+    double signedAreaTwice = 0.0;
+    for (int i = 0; i < cornerCount; ++i)
+        signedAreaTwice += cross2d(polygon.at(i), polygon.at((i + 1) % cornerCount));
+    if (!std::isfinite(signedAreaTwice) || std::abs(signedAreaTwice) <= epsilon)
+        return false;
+
+    // The current renderer tessellates polygons as a triangle fan, so accept
+    // only strictly convex, planar faces here. Rejecting unsupported topology
+    // is safer than silently producing a visibly incorrect surface.
+    const float winding = signedAreaTwice > 0 ? 1.0f : -1.0f;
+    for (int i = 0; i < cornerCount; ++i) {
+        const QVector2D &previous = polygon.at((i + cornerCount - 1) % cornerCount);
+        const QVector2D &current = polygon.at(i);
+        const QVector2D &next = polygon.at((i + 1) % cornerCount);
+        if (orientation(previous, current, next) * winding <= epsilon)
+            return false;
+    }
+
+    auto onSegment = [&epsilon](const QVector2D &a,
+                                const QVector2D &b,
+                                const QVector2D &p) {
+        return p.x() >= std::min(a.x(), b.x()) - epsilon
+            && p.x() <= std::max(a.x(), b.x()) + epsilon
+            && p.y() >= std::min(a.y(), b.y()) - epsilon
+            && p.y() <= std::max(a.y(), b.y()) + epsilon;
+    };
+    auto segmentsIntersect = [&orientation, &onSegment, &epsilon](
+                                 const QVector2D &a, const QVector2D &b,
+                                 const QVector2D &c, const QVector2D &d) {
+        const float o1 = orientation(a, b, c);
+        const float o2 = orientation(a, b, d);
+        const float o3 = orientation(c, d, a);
+        const float o4 = orientation(c, d, b);
+
+        if (((o1 > epsilon && o2 < -epsilon) || (o1 < -epsilon && o2 > epsilon))
+            && ((o3 > epsilon && o4 < -epsilon) || (o3 < -epsilon && o4 > epsilon)))
+            return true;
+        if (std::abs(o1) <= epsilon && onSegment(a, b, c)) return true;
+        if (std::abs(o2) <= epsilon && onSegment(a, b, d)) return true;
+        if (std::abs(o3) <= epsilon && onSegment(c, d, a)) return true;
+        if (std::abs(o4) <= epsilon && onSegment(c, d, b)) return true;
+        return false;
+    };
+
+    // Non-adjacent edges may not cross or touch.
+    for (int i = 0; i < cornerCount; ++i) {
+        const int iNext = (i + 1) % cornerCount;
+        for (int j = i + 1; j < cornerCount; ++j) {
+            const int jNext = (j + 1) % cornerCount;
+            if (i == j || iNext == j || jNext == i)
+                continue;
+            if (segmentsIntersect(polygon.at(i), polygon.at(iNext),
+                                  polygon.at(j), polygon.at(jNext))) {
+                return false;
+            }
+        }
+    }
+
+    m_faces.append(face);
+    rebuildGeometry();
+    emit meshChanged();
+    return true;
+}
+
 QVariantMap EditableGeometry::serializeMesh() const
 {
     QVariantList vertices;
