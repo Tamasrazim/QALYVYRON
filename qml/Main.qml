@@ -41,9 +41,32 @@ ApplicationWindow {
     property bool editorReady: false
     property var meshVertexSelection: []
     property bool vertexSelectionMode: false
+    property int requestedRenderWidth: 1920
+    property int requestedRenderHeight: 1080
+    property int requestedRenderSamples: 8
+    property real renderProgressValue: 0
+    property string renderStatusText: "Ready"
 
     ListModel {
         id: objectList
+    }
+
+    Connections {
+        target: finalRenderer
+
+        function onProgressChanged() {
+            root.renderProgressValue = finalRenderer.progress
+        }
+
+        function onStatusChanged() {
+            root.renderStatusText = finalRenderer.status
+        }
+
+        function onRenderFinished(success, message) {
+            root.renderStatusText = message
+            root.renderProgressValue = finalRenderer.progress
+            root.setStatus(message)
+        }
     }
 
     function setStatus(message) {
@@ -1246,6 +1269,166 @@ ApplicationWindow {
         onOpened: Qt.callLater(root.refreshMeshEditFields)
     }
 
+    Dialog {
+        id: renderSettingsDialog
+        title: "Offline Image Render"
+        modal: true
+        focus: true
+        width: 460
+        height: 310
+        x: (root.width - width) / 2
+        y: (root.height - height) / 2
+        standardButtons: Dialog.NoButton
+
+        contentItem: ColumnLayout {
+            spacing: 14
+
+            Text {
+                Layout.fillWidth: true
+                text: "Render the saved scene geometry to a full-resolution PNG. This runs separately from the live viewport and keeps the workspace responsive."
+                color: root.secondaryText
+                font.pixelSize: 11
+                wrapMode: Text.WordWrap
+            }
+
+            Text {
+                text: "OUTPUT RESOLUTION"
+                color: "#bcbcbc"
+                font.pixelSize: 10
+                font.bold: true
+                font.letterSpacing: 1.2
+            }
+
+            ComboBox {
+                id: renderResolutionCombo
+                Layout.fillWidth: true
+                model: ["1280x720", "1920x1080", "2560x1440", "3840x2160", "7680x4320"]
+                currentIndex: 1
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Text {
+                    text: "Samples per pixel"
+                    color: root.secondaryText
+                    font.pixelSize: 11
+                }
+                Item { Layout.fillWidth: true }
+                SpinBox {
+                    id: renderSamplesSpinBox
+                    from: 1
+                    to: 64
+                    value: 8
+                    editable: true
+                }
+            }
+
+            Text {
+                Layout.fillWidth: true
+                text: "Higher sample counts reduce edge noise but increase render time. 8K output is supported up to the application pixel-memory limit. The renderer currently provides direct lighting and hard shadows; indirect light transport is not implemented yet."
+                color: "#777777"
+                font.pixelSize: 10
+                wrapMode: Text.WordWrap
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Item { Layout.fillWidth: true }
+                Button {
+                    text: "Cancel"
+                    onClicked: renderSettingsDialog.close()
+                }
+                Button {
+                    text: "Choose Output…"
+                    highlighted: true
+                    onClicked: {
+                        const parts = String(renderResolutionCombo.currentText).split("x")
+                        root.requestedRenderWidth = Number(parts[0])
+                        root.requestedRenderHeight = Number(parts[1])
+                        root.requestedRenderSamples = renderSamplesSpinBox.value
+                        renderSettingsDialog.close()
+                        Qt.callLater(renderOutputDialog.open)
+                    }
+                }
+            }
+        }
+    }
+
+    FileDialog {
+        id: renderOutputDialog
+        title: "Save Final Render"
+        fileMode: FileDialog.SaveFile
+        nameFilters: ["PNG image (*.png)"]
+        defaultSuffix: "png"
+
+        onAccepted: {
+            const started = finalRenderer.startRender(
+                selectedFile,
+                root.serializeScene(),
+                root.requestedRenderWidth,
+                root.requestedRenderHeight,
+                root.requestedRenderSamples)
+            if (started) {
+                root.renderProgressValue = 0
+                root.renderProgressDialog.open()
+            } else {
+                root.setStatus(finalRenderer.status)
+            }
+        }
+    }
+
+    Dialog {
+        id: renderProgressDialog
+        title: "Rendering Image"
+        modal: false
+        dim: false
+        focus: true
+        width: 470
+        height: 245
+        x: (root.width - width) / 2
+        y: (root.height - height) / 2
+        standardButtons: Dialog.NoButton
+
+        contentItem: ColumnLayout {
+            spacing: 13
+
+            Text {
+                Layout.fillWidth: true
+                text: root.renderStatusText
+                color: root.mainText
+                font.pixelSize: 12
+                wrapMode: Text.WordWrap
+            }
+
+            ProgressBar {
+                Layout.fillWidth: true
+                from: 0
+                to: 100
+                value: root.renderProgressValue
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Text {
+                    text: Math.round(root.renderProgressValue) + "%"
+                    color: root.secondaryText
+                    font.pixelSize: 10
+                }
+                Item { Layout.fillWidth: true }
+                Button {
+                    text: finalRenderer.busy ? "Cancel Render" : "Close"
+                    highlighted: !finalRenderer.busy
+                    onClicked: {
+                        if (finalRenderer.busy)
+                            finalRenderer.cancelRender()
+                        else
+                            renderProgressDialog.close()
+                    }
+                }
+            }
+        }
+    }
+
     FileDialog {
         id: importAssetDialog
         title: "Import 3D Asset"
@@ -1401,6 +1584,11 @@ ApplicationWindow {
                     font.letterSpacing: 1.2
                 }
 
+                Button {
+                    text: "Render Image"
+                    highlighted: true
+                    onClicked: renderSettingsDialog.open()
+                }
                 Button {
                     text: "Export OBJ"
                     onClicked: exportObjDialog.open()
