@@ -424,8 +424,8 @@ ApplicationWindow {
             return
         }
 
-        faceIndexSpinner.to = Math.max(0, geometry.faceCount - 1)
-        vertexIndexSpinner.to = Math.max(0, geometry.vertexCount - 1)
+        // The spinner ranges are bound to meshChanged notifications.
+        // Do not assign to their "to" properties here, which would break those bindings.
         refreshMeshEditFields()
         setStatus("Extruded face and updated mesh topology.")
     }
