@@ -284,10 +284,19 @@ bool EditableGeometry::loadMesh(const QVariantMap &data)
         faces.append(face);
     }
 
-    const QString loadedShape = data.value(QStringLiteral("shape"), m_shape).toString();
+    const QString requestedShape = data.value(QStringLiteral("shape"), m_shape).toString();
+    const QString loadedShape =
+        (requestedShape == QLatin1String("Cube")
+         || requestedShape == QLatin1String("Sphere")
+         || requestedShape == QLatin1String("Cylinder")
+         || requestedShape == QLatin1String("Cone")
+         || requestedShape == QLatin1String("Plane")
+         || requestedShape == QLatin1String("Custom"))
+        ? requestedShape : QStringLiteral("Custom");
+
     m_vertices = vertices;
     m_faces = faces;
-    m_shape = loadedShape.isEmpty() ? QStringLiteral("Custom") : loadedShape;
+    m_shape = loadedShape;
     rebuildGeometry();
     emit shapeChanged();
     emit meshChanged();
