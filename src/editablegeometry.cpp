@@ -237,6 +237,8 @@ bool EditableGeometry::insetFace(int faceIndex, double distance)
     polygon.reserve(boundary.size());
     for (const int vertexIndex : boundary) {
         const QVector3D relative = m_vertices.at(vertexIndex) - origin;
+        if (std::abs(QVector3D::dotProduct(relative, normal)) > 1.0e-2f)
+            return false; // A planar inset cannot safely reshape a warped face.
         polygon.append(QVector2D(QVector3D::dotProduct(relative, axisU),
                                  QVector3D::dotProduct(relative, axisV)));
     }
@@ -274,8 +276,8 @@ bool EditableGeometry::insetFace(int faceIndex, double distance)
         inwardNormals.append(inward * winding);
     }
 
-    QVector<int> insetIndices;
-    insetIndices.reserve(boundary.size());
+    QVector<QVector3D> insetPositions;
+    insetPositions.reserve(boundary.size());
     QVector<QVector2D> insetPolygon;
     insetPolygon.reserve(boundary.size());
 
@@ -304,9 +306,7 @@ bool EditableGeometry::insetFace(int faceIndex, double distance)
             || std::abs(position.z()) > 1.0e6f) {
             return false;
         }
-
-        insetIndices.append(m_vertices.size());
-        m_vertices.append(position);
+        insetPositions.append(position);
     }
 
     double insetAreaTwice = 0.0;
@@ -317,10 +317,15 @@ bool EditableGeometry::insetFace(int faceIndex, double distance)
     if (!std::isfinite(insetAreaTwice)
         || insetAreaTwice * signedAreaTwice <= 0.0
         || std::abs(insetAreaTwice) >= std::abs(signedAreaTwice)) {
-        // Roll back the temporary vertices: an excessive inset collapses or
-        // crosses the polygon, which is not a valid mesh-edit result.
-        m_vertices.resize(m_vertices.size() - boundary.size());
+        // Reject a collapsed or crossing inset without modifying the live mesh.
         return false;
+    }
+
+    QVector<int> insetIndices;
+    insetIndices.reserve(insetPositions.size());
+    for (const QVector3D &position : insetPositions) {
+        insetIndices.append(m_vertices.size());
+        m_vertices.append(position);
     }
 
     // The outer cap becomes an inner cap. Side faces bridge the old boundary
