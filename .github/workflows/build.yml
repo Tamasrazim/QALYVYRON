@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   linux-qt-build:
-    name: Linux / Qt 6
+    name: Linux / Qt 6 build and tests
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
@@ -36,3 +36,50 @@ jobs:
 
       - name: Run project I/O tests
         run: ctest --test-dir build --output-on-failure
+
+  windows-portable-build:
+    name: Windows x64 / portable package
+    runs-on: windows-2022
+    timeout-minutes: 50
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up the MSVC build environment
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install Qt 6
+        uses: jurplel/install-qt-action@v4.3.1
+        with:
+          version: '6.8.3'
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          modules: 'qtquick3d qtshadertools'
+          cache: true
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --parallel 2
+
+      - name: Run project I/O tests
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Stage portable application
+        shell: pwsh
+        run: |
+          cmake --install build --config Release --prefix "$PWD/dist"
+          windeployqt --release --qmldir qml "$PWD/dist/bin/QALYVYRON.exe"
+          Copy-Item README.md "$PWD/dist/README.md"
+          Copy-Item ROADMAP.md "$PWD/dist/ROADMAP.md"
+          Compress-Archive -Path "$PWD/dist/bin/*" -DestinationPath "$PWD/QALYVYRON-Windows-x64.zip" -Force
+
+      - name: Upload Windows portable package
+        uses: actions/upload-artifact@v4
+        with:
+          name: QALYVYRON-Windows-x64
+          path: QALYVYRON-Windows-x64.zip
+          if-no-files-found: error
+          retention-days: 14
