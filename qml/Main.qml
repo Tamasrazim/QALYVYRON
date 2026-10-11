@@ -39,6 +39,8 @@ ApplicationWindow {
     property int historyLimit: 80
     property bool historyLocked: false
     property bool editorReady: false
+    property var meshVertexSelection: []
+    property bool vertexSelectionMode: false
 
     ListModel {
         id: objectList
@@ -368,12 +370,57 @@ ApplicationWindow {
         return selectedObject.geometry
     }
 
+    function clearMeshVertexSelection() {
+        meshVertexSelection = []
+    }
+
+    function toggleMeshVertexSelection(index) {
+        if (!selectedEditableGeometry())
+            return
+
+        const selection = meshVertexSelection.slice()
+        const existingIndex = selection.indexOf(index)
+        if (existingIndex >= 0)
+            selection.splice(existingIndex, 1)
+        else
+            selection.push(index)
+
+        meshVertexSelection = selection
+        vertexIndexSpinner.value = index
+        refreshMeshEditFields()
+        setStatus(meshVertexSelection.length + " mesh vertex/vertices selected in boundary order.")
+    }
+
     function selectMeshVertex(index) {
         if (!selectedEditableGeometry())
             return
+        if (vertexSelectionMode) {
+            toggleMeshVertexSelection(index)
+            return
+        }
         vertexIndexSpinner.value = Math.max(0, Math.min(selectedObject.geometry.vertexCount - 1, index))
         refreshMeshEditFields()
         setStatus("Selected vertex " + vertexIndexSpinner.value + ".")
+    }
+
+    function createFaceFromSelectedVertices() {
+        const geometry = selectedEditableGeometry()
+        if (!geometry || meshVertexSelection.length < 3) {
+            setStatus("Select at least three vertices in boundary order.")
+            return
+        }
+
+        pushUndoSnapshot()
+        if (!geometry.createFace(meshVertexSelection)) {
+            setStatus("Face creation failed. Choose unique, coplanar vertices around a convex boundary.")
+            return
+        }
+
+        faceIndexSpinner.value = geometry.faceCount - 1
+        clearMeshVertexSelection()
+        vertexSelectionMode = false
+        refreshMeshEditFields()
+        setStatus("Created a polygon face from the selected vertices.")
     }
 
     function selectMeshFace(index) {
@@ -989,6 +1036,45 @@ ApplicationWindow {
                     Item { Layout.fillWidth: true }
                 }
 
+                RowLayout {
+                    Layout.fillWidth: true
+                    Button {
+                        Layout.fillWidth: true
+                        text: root.vertexSelectionMode ? "Vertex Selection: ON" : "Select Face Vertices"
+                        highlighted: root.vertexSelectionMode
+                        onClicked: {
+                            root.vertexSelectionMode = !root.vertexSelectionMode
+                            if (!root.vertexSelectionMode)
+                                root.clearMeshVertexSelection()
+                            root.setStatus(root.vertexSelectionMode
+                                           ? "Click vertex markers in boundary order, then create a face."
+                                           : "Vertex multi-selection mode closed.")
+                        }
+                    }
+                    Button {
+                        text: "Clear"
+                        enabled: root.meshVertexSelection.length > 0
+                        onClicked: root.clearMeshVertexSelection()
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Text {
+                        Layout.fillWidth: true
+                        text: root.meshVertexSelection.length + " vertices selected"
+                        color: root.secondaryText
+                        font.pixelSize: 10
+                    }
+                    Button {
+                        text: "Create Face"
+                        enabled: root.selectedObject !== null
+                                 && !root.selectedObject.editorImported
+                                 && root.meshVertexSelection.length >= 3
+                        onClicked: root.createFaceFromSelectedVertices()
+                    }
+                }
+
                 GridLayout {
                     Layout.fillWidth: true
                     columns: 2
@@ -1143,7 +1229,7 @@ ApplicationWindow {
 
                 Text {
                     Layout.fillWidth: true
-                    text: "Click viewport markers to select vertices or faces. Tools: vertex coordinates, merge vertices, face extrusion, inset on convex planar faces, and face deletion. Edge selection, bevel, loop tools and advanced topology operations remain future work."
+                    text: "Enable Select Face Vertices, then click vertex markers in boundary order and choose Create Face. Other tools edit coordinates, merge vertices, extrude/inset faces, and delete faces. Bevel, edge selection, loops and advanced topology still need implementation."
                     color: "#777777"
                     font.pixelSize: 10
                     wrapMode: Text.WordWrap
@@ -1750,7 +1836,8 @@ ApplicationWindow {
                                     const scene = root.selectedObject.mapPositionToScene(local)
                                     return view3d.mapFrom3DScene(scene)
                                 }
-                                width: index === vertexIndexSpinner.value ? 13 : 9
+                                readonly property bool isVertexSelected: root.meshVertexSelection.indexOf(index) >= 0
+                                width: isVertexSelected ? 14 : (index === vertexIndexSpinner.value ? 13 : 9)
                                 height: width
                                 radius: width / 2
                                 x: projectedPosition.x - width / 2
@@ -1764,7 +1851,8 @@ ApplicationWindow {
                                          && projectedPosition.x <= view3d.width
                                          && projectedPosition.y >= 0
                                          && projectedPosition.y <= view3d.height
-                                color: index === vertexIndexSpinner.value ? "#ffffff" : "#d0d0d0"
+                                color: isVertexSelected ? "#ffffff"
+                                       : (index === vertexIndexSpinner.value ? "#e5e5e5" : "#a0a0a0")
                                 border.color: "#111111"
                                 border.width: 1
 
