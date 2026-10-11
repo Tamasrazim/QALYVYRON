@@ -485,6 +485,28 @@ ApplicationWindow {
         setStatus("Inset face and updated mesh topology.")
     }
 
+    function deleteSelectedFace() {
+        const geometry = selectedEditableGeometry()
+        if (!geometry)
+            return
+
+        if (geometry.faceCount <= 1) {
+            setStatus("A mesh must keep at least one face.")
+            return
+        }
+
+        pushUndoSnapshot()
+        if (!geometry.deleteFace(faceIndexSpinner.value)) {
+            setStatus("Face deletion was rejected; the mesh has not changed.")
+            return
+        }
+
+        faceIndexSpinner.value = Math.min(faceIndexSpinner.value, geometry.faceCount - 1)
+        vertexIndexSpinner.value = Math.min(vertexIndexSpinner.value, geometry.vertexCount - 1)
+        refreshMeshEditFields()
+        setStatus("Deleted face and compacted unused mesh vertices.")
+    }
+
     function updateTransform(axis, inputText) {
         if (!selectedObject || selectedIndex < 0)
             return
@@ -1036,9 +1058,26 @@ ApplicationWindow {
                     }
                 }
 
+                RowLayout {
+                    Layout.fillWidth: true
+                    Text {
+                        text: "TOPOLOGY"
+                        color: root.secondaryText
+                        font.pixelSize: 10
+                        font.bold: true
+                        font.letterSpacing: 1.0
+                    }
+                    Item { Layout.fillWidth: true }
+                    Button {
+                        text: "Delete Face"
+                        enabled: root.selectedObject !== null && !root.selectedObject.editorImported
+                        onClicked: root.deleteSelectedFace()
+                    }
+                }
+
                 Text {
                     Layout.fillWidth: true
-                    text: "Click the viewport markers to choose a vertex or face. This early toolset supports vertex coordinates, face extrusion, and inset on convex planar faces. Edge selection, bevel, merge, and advanced Edit Mode tools are still under development."
+                    text: "Click the viewport markers to choose a vertex or face. This early toolset supports vertex coordinates, face extrusion, inset on convex planar faces, and face deletion. Edge selection, bevel, merge, and advanced Edit Mode tools are still under development."
                     color: "#777777"
                     font.pixelSize: 10
                     wrapMode: Text.WordWrap
