@@ -8,6 +8,8 @@ QALYVYRON is being developed as a local desktop tool for creating, editing, anim
 
 ## Implemented in the main build
 
+- First-run welcome screen and a four-step, task-based quick tour; beginner mode keeps common actions visible while hiding numeric transforms, lighting, camera, roughness, and mesh-editing controls until requested.
+- A simple one-cube starting scene, plain-language shape labels, a beginner size slider, and clear viewport mouse guidance.
 - Interactive 3D viewport with orbit, zoom, selection, and a reference grid.
 - Cube, sphere, cylinder, cone, and plane scene objects.
 - Object hierarchy, renaming, duplication, deletion, and direct transform editing.
@@ -36,7 +38,7 @@ The rule for the project is simple: **a control is not considered implemented ju
 - **Independent:** no Blender installation, Blender runtime, account, subscription, or cloud service is required.
 - **Offline-first:** projects and rendering are intended to work locally.
 - **Actual 3D:** use real geometry, cameras, materials and lights instead of 2D mockups.
-- **Progressive complexity:** simple defaults first, deeper controls as the workflow grows.
+- **Progressive complexity:** the first screen explains tasks in everyday language; deeper controls stay tucked away until requested.
 - **Honest output:** preview quality and final-render quality are clearly separated.
 - **Monochrome interface:** black, white and grayscale UI; scene content can use any colors.
 - **Recoverable editing:** project validation, bounded undo/redo, and tests are part of the product, not optional polish.
@@ -63,7 +65,7 @@ cmake --build build --parallel 2
 ctest --test-dir build --output-on-failure
 ```
 
-The CI workflow builds and tests on Linux and builds a Windows x64 package. The Windows packaging step recently exposed a missing Qt Quick Timeline deployment dependency, so the updated dependency and latest mesh/OBJ changes still need a fresh green run before a Windows package can be considered validated. A successful C++ build alone does not prove the QML application works on every GPU.
+The CI workflow builds and tests on Linux and builds a Windows x64 portable package. The Windows job now launches the staged desktop app before packaging it and writes Qt/QML startup messages to a diagnostic log if it exits early. Treat the package as unverified unless both build jobs and the packaged-app startup smoke test pass; a successful C++ build alone does not prove the QML application works on every GPU.
 
 ## Repository files
 

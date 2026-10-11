@@ -4,14 +4,18 @@ This guide covers the current mainline application. Remaining feature gaps are l
 
 ## Start a scene
 
-The application opens with a cube and sphere. Use the **Create** panel to add a cube, sphere, cylinder, cone, or plane. Use **Scene Objects** to select an object, rename it in the inspector, duplicate it, or remove it.
+The first launch opens a welcome screen. Choose **Start creating** to enter the workspace, **Take the quick tour** to learn the basics, or **Import a model** to open a local asset. The checkbox remembers whether the screen should appear at startup.
+
+A new scene starts with one cube so there is only one thing to focus on. Use **Add a Shape** to add a cube, ball, cylinder, cone, or plane. Use **Your Objects** to select a shape, rename it, copy it, or remove it.
+
+**Simple view** is enabled by default. It shows color and size controls and keeps detailed numeric transforms, lighting, camera, roughness, and mesh-editing tools out of the way. Click **Show all tools** at the top when you need more control. Click **Simple view** to return to the beginner layout.
 
 ## Navigate the viewport
 
-- **Right mouse drag:** orbit the camera around the scene.
+- **Right mouse drag on empty space:** look around the scene.
 - **Mouse wheel:** zoom in or out.
 - **Left click:** select an object.
-- **Left drag on an object:** move it in the scene.
+- **Left drag on a shape:** move it in the scene.
 - **Front / Top / Side:** choose a useful view.
 - **Frame Scene:** return to the default framing.
 

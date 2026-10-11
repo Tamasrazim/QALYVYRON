@@ -81,6 +81,7 @@ jobs:
           $exe = Join-Path $PWD "dist/bin/QALYVYRON.exe"
           $stdout = Join-Path $PWD "qalyvyron-startup.stdout.log"
           $stderr = Join-Path $PWD "qalyvyron-startup.stderr.log"
+          $env:QALYVYRON_LOG_FILE = Join-Path $PWD "qalyvyron-startup.log"
           $process = Start-Process -FilePath $exe -PassThru -WindowStyle Hidden `
             -WorkingDirectory (Split-Path $exe) `
             -RedirectStandardOutput $stdout -RedirectStandardError $stderr
@@ -91,6 +92,8 @@ jobs:
             if (Test-Path $stdout) { Get-Content $stdout }
             Write-Host "Application stderr:"
             if (Test-Path $stderr) { Get-Content $stderr }
+            Write-Host "Application diagnostic log:"
+            if (Test-Path $env:QALYVYRON_LOG_FILE) { Get-Content $env:QALYVYRON_LOG_FILE }
             throw "QALYVYRON exited during the Windows startup smoke test (exit code $($process.ExitCode))."
           }
           Stop-Process -Id $process.Id -Force

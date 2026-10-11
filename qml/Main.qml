@@ -39,6 +39,8 @@ ApplicationWindow {
     property int historyLimit: 80
     property bool historyLocked: false
     property bool editorReady: false
+    property bool beginnerMode: true
+    property int tutorialStep: 0
     property var meshVertexSelection: []
     property bool vertexSelectionMode: false
     property int requestedRenderWidth: 1920
@@ -750,8 +752,7 @@ ApplicationWindow {
             pushUndoSnapshot()
 
         clearScene()
-        addPrimitive("Cube", {id: "object-1", label: "Cube 1", x: -60, y: 0, z: 0, scale: 1, color: "#c8c8c8"})
-        addPrimitive("Sphere", {id: "object-2", label: "Sphere 2", x: 65, y: 0, z: 0, scale: 1, color: "#508bdc"})
+        addPrimitive("Cube", {id: "object-1", label: "Cube", x: 0, y: 0, z: 0, scale: 1, color: "#c8c8c8"})
         orbitYaw = 34
         orbitPitch = 23
         orbitDistance = 470
@@ -1525,6 +1526,220 @@ ApplicationWindow {
         onAccepted: root.exportViewportPreview(selectedFile)
     }
 
+    Dialog {
+        id: introDialog
+        title: "Welcome to QALYVYRON"
+        modal: true
+        focus: true
+        width: 650
+        height: 450
+        x: (root.width - width) / 2
+        y: (root.height - height) / 2
+        standardButtons: Dialog.NoButton
+        onClosed: projectIO.setHasSeenWelcome(rememberWelcomeCheck.checked)
+
+        background: Rectangle {
+            color: "#111111"
+            border.color: "#454545"
+            radius: 7
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 13
+            Text {
+                Layout.fillWidth: true
+                text: "Make something in 3D."
+                color: root.mainText
+                font.pixelSize: 26
+                font.bold: true
+            }
+            Text {
+                Layout.fillWidth: true
+                text: "No experience needed. Start with one simple shape, then move it, change its color and save your work."
+                color: root.secondaryText
+                font.pixelSize: 13
+                wrapMode: Text.WordWrap
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 10
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 108
+                    radius: 5
+                    color: "#191919"
+                    border.color: root.borderColor
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        spacing: 6
+                        Text { text: "01  ADD"; color: root.mainText; font.bold: true; font.pixelSize: 12 }
+                        Text {
+                            Layout.fillWidth: true
+                            text: "Choose Cube, Ball, or another shape on the left."
+                            color: root.secondaryText
+                            font.pixelSize: 11
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+                }
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 108
+                    radius: 5
+                    color: "#191919"
+                    border.color: root.borderColor
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        spacing: 6
+                        Text { text: "02  MOVE"; color: root.mainText; font.bold: true; font.pixelSize: 12 }
+                        Text {
+                            Layout.fillWidth: true
+                            text: "Drag a shape to move it. Right-drag the background to look around."
+                            color: root.secondaryText
+                            font.pixelSize: 11
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+                }
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 108
+                    radius: 5
+                    color: "#191919"
+                    border.color: root.borderColor
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        spacing: 6
+                        Text { text: "03  FINISH"; color: root.mainText; font.bold: true; font.pixelSize: 12 }
+                        Text {
+                            Layout.fillWidth: true
+                            text: "Save a scene to reopen it later, or render a PNG picture."
+                            color: root.secondaryText
+                            font.pixelSize: 11
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+                Button {
+                    text: "Start creating"
+                    highlighted: true
+                    onClicked: {
+                        root.beginnerMode = true
+                        introDialog.close()
+                        root.selectObject("object-1")
+                        root.setStatus("Start by choosing a shape on the left.")
+                    }
+                }
+                Button {
+                    text: "Take the quick tour"
+                    onClicked: {
+                        root.tutorialStep = 0
+                        introDialog.close()
+                        Qt.callLater(tutorialDialog.open)
+                    }
+                }
+                Button {
+                    text: "Import a model"
+                    onClicked: {
+                        introDialog.close()
+                        Qt.callLater(importAssetDialog.open)
+                    }
+                }
+            }
+
+            Item { Layout.fillHeight: true }
+
+            CheckBox {
+                id: rememberWelcomeCheck
+                checked: false
+                text: "Don't show this screen when I launch QALYVYRON"
+            }
+        }
+    }
+
+    Dialog {
+        id: tutorialDialog
+        title: "The one-minute tour"
+        modal: true
+        focus: true
+        width: 560
+        height: 350
+        x: (root.width - width) / 2
+        y: (root.height - height) / 2
+        standardButtons: Dialog.NoButton
+
+        contentItem: ColumnLayout {
+            spacing: 12
+            Text {
+                Layout.fillWidth: true
+                text: ["1 of 4  ·  Add a shape",
+                       "2 of 4  ·  Move and look around",
+                       "3 of 4  ·  Change the look",
+                       "4 of 4  ·  Save or render"][root.tutorialStep]
+                color: root.mainText
+                font.pixelSize: 21
+                font.bold: true
+                wrapMode: Text.WordWrap
+            }
+            Rectangle {
+                Layout.fillWidth: true
+                height: 1
+                color: root.borderColor
+            }
+            Text {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                text: [
+                    "Click a shape on the left to add it. A cube is already waiting for you. Nothing you do here changes your computer or original files until you save or export.",
+                    "Left-drag a shape to move it. Right-drag an empty area to rotate your view. Turn the mouse wheel to zoom in or out. Click any shape to select it.",
+                    "Select a shape, then choose a color in the right-hand Look panel. Use the Size slider to make it bigger or smaller. Choose Show all tools when you are ready for detailed controls.",
+                    "Click Save to keep an editable QALYVYRON scene. Click Render Image to create a PNG image from the scene. Export Preview is only a picture of the current viewport."
+                ][root.tutorialStep]
+                color: root.secondaryText
+                font.pixelSize: 14
+                lineHeight: 1.25
+                wrapMode: Text.WordWrap
+                verticalAlignment: Text.AlignVCenter
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Button {
+                    text: "Back"
+                    enabled: root.tutorialStep > 0
+                    onClicked: root.tutorialStep = Math.max(0, root.tutorialStep - 1)
+                }
+                Button {
+                    visible: root.tutorialStep === 0
+                    text: "Add a cube now"
+                    onClicked: {
+                        root.createPrimitive("Cube")
+                        root.tutorialStep = 1
+                    }
+                }
+                Item { Layout.fillWidth: true }
+                Button {
+                    text: root.tutorialStep === 3 ? "Finish" : "Next"
+                    highlighted: true
+                    onClicked: {
+                        if (root.tutorialStep < 3)
+                            root.tutorialStep += 1
+                        else
+                            tutorialDialog.close()
+                    }
+                }
+            }
+        }
+    }
+
     Timer {
         id: statusTimer
         interval: 7000
@@ -1594,6 +1809,19 @@ ApplicationWindow {
                     enabled: root.redoStack.length > 0
                     onClicked: root.redo()
                 }
+                Button {
+                    text: "First steps"
+                    onClicked: introDialog.open()
+                }
+                Button {
+                    text: root.beginnerMode ? "Show all tools" : "Simple view"
+                    onClicked: {
+                        root.beginnerMode = !root.beginnerMode
+                        root.setStatus(root.beginnerMode
+                                       ? "Simple view: common controls only."
+                                       : "All tools are visible.")
+                    }
+                }
 
                 Item { Layout.fillWidth: true }
 
@@ -1638,11 +1866,20 @@ ApplicationWindow {
                     spacing: 12
 
                     Text {
-                        text: "CREATE"
+                        text: root.beginnerMode ? "ADD A SHAPE" : "CREATE"
                         color: root.secondaryText
                         font.pixelSize: 10
                         font.bold: true
                         font.letterSpacing: 1.8
+                    }
+
+                    Text {
+                        visible: root.beginnerMode
+                        Layout.fillWidth: true
+                        text: "Pick one. You can move it or change its color later."
+                        color: "#858585"
+                        font.pixelSize: 10
+                        wrapMode: Text.WordWrap
                     }
 
                     GridLayout {
@@ -1658,7 +1895,7 @@ ApplicationWindow {
                         }
                         Button {
                             Layout.fillWidth: true
-                            text: "+ Sphere"
+                            text: "+ Ball"
                             onClicked: root.createPrimitive("Sphere")
                         }
                         Button {
@@ -1680,13 +1917,13 @@ ApplicationWindow {
 
                     Button {
                         Layout.fillWidth: true
-                        text: "Import 3D Asset"
+                        text: "Import a 3D model"
                         onClicked: importAssetDialog.open()
                     }
 
                     Text {
                         Layout.fillWidth: true
-                        text: "Imports local GLB, glTF 2.0 and OBJ files."
+                        text: "Open a model file (.glb, .gltf or .obj)."
                         color: "#707070"
                         font.pixelSize: 9
                         wrapMode: Text.WordWrap
@@ -1701,7 +1938,7 @@ ApplicationWindow {
                     RowLayout {
                         Layout.fillWidth: true
                         Text {
-                            text: "SCENE OBJECTS"
+                            text: root.beginnerMode ? "YOUR OBJECTS" : "SCENE OBJECTS"
                             color: root.secondaryText
                             font.pixelSize: 10
                             font.bold: true
@@ -1782,6 +2019,7 @@ ApplicationWindow {
 
                     Button {
                         Layout.fillWidth: true
+                        visible: !root.beginnerMode
                         text: "Edit Selected Mesh"
                         enabled: root.selectedIndex >= 0 && root.selectedObject !== null
                                  && !root.selectedObject.editorImported
@@ -1790,7 +2028,7 @@ ApplicationWindow {
 
                     Button {
                         Layout.fillWidth: true
-                        text: "Duplicate Selected"
+                        text: "Copy selected"
                         enabled: root.selectedIndex >= 0
                         onClicked: root.duplicateSelected()
                     }
@@ -1846,7 +2084,9 @@ ApplicationWindow {
                             }
                             Item { Layout.fillWidth: true }
                             Text {
-                                text: "Right-drag: orbit    •    Wheel: zoom    •    Click: select"
+                                text: root.beginnerMode
+                                      ? "Drag a shape to move it  •  Right-drag to look around  •  Wheel to zoom"
+                                      : "Right-drag: orbit    •    Wheel: zoom    •    Click: select"
                                 color: "#7a7a7a"
                                 font.pixelSize: 10
                             }
@@ -2392,6 +2632,7 @@ ApplicationWindow {
                     }
 
                     Text {
+                        visible: !root.beginnerMode
                         text: "TRANSFORM"
                         color: "#bcbcbc"
                         font.pixelSize: 10
@@ -2400,12 +2641,14 @@ ApplicationWindow {
                     }
 
                     Text {
+                        visible: !root.beginnerMode
                         text: "Position"
                         color: root.secondaryText
                         font.pixelSize: 10
                     }
 
                     GridLayout {
+                        visible: !root.beginnerMode
                         Layout.fillWidth: true
                         columns: 2
                         columnSpacing: 8
@@ -2441,12 +2684,14 @@ ApplicationWindow {
                     }
 
                     Text {
+                        visible: !root.beginnerMode
                         text: "Rotation (degrees)"
                         color: root.secondaryText
                         font.pixelSize: 10
                     }
 
                     GridLayout {
+                        visible: !root.beginnerMode
                         Layout.fillWidth: true
                         columns: 2
                         columnSpacing: 8
@@ -2482,6 +2727,7 @@ ApplicationWindow {
                     }
 
                     RowLayout {
+                        visible: !root.beginnerMode
                         Layout.fillWidth: true
                         Text {
                             text: "Uniform scale"
@@ -2499,6 +2745,36 @@ ApplicationWindow {
                         }
                     }
 
+                    Text {
+                        visible: root.beginnerMode
+                        text: "Size"
+                        color: root.secondaryText
+                        font.pixelSize: 11
+                    }
+
+                    Slider {
+                        id: beginnerScaleSlider
+                        visible: root.beginnerMode
+                        Layout.fillWidth: true
+                        enabled: root.selectedObject !== null
+                        from: 0.25
+                        to: 3
+                        stepSize: 0.05
+                        value: root.selectedObject
+                               ? Math.max(0.25, Math.min(3, root.selectedObject.uniformScale)) : 1
+                        onPressedChanged: if (pressed) root.pushUndoSnapshot()
+                        onMoved: {
+                            if (!root.selectedObject)
+                                return
+                            const scale = Math.max(0.25, Math.min(3, value))
+                            root.selectedObject.uniformScale = scale
+                            root.selectedObject.scale = Qt.vector3d(scale, scale, scale)
+                            if (root.selectedIndex >= 0)
+                                objectList.setProperty(root.selectedIndex, "scale", scale)
+                            root.refreshInspector()
+                        }
+                    }
+
                     Rectangle {
                         Layout.fillWidth: true
                         height: 1
@@ -2506,7 +2782,7 @@ ApplicationWindow {
                     }
 
                     Text {
-                        text: "MATERIAL"
+                        text: root.beginnerMode ? "LOOK" : "MATERIAL"
                         color: "#bcbcbc"
                         font.pixelSize: 10
                         font.bold: true
@@ -2537,6 +2813,7 @@ ApplicationWindow {
                     }
 
                     RowLayout {
+                        visible: !root.beginnerMode
                         Layout.fillWidth: true
                         Text {
                             text: "Roughness"
@@ -2553,6 +2830,7 @@ ApplicationWindow {
 
                     Slider {
                         id: roughnessSlider
+                        visible: !root.beginnerMode
                         Layout.fillWidth: true
                         enabled: root.selectedObject !== null && !root.selectedObject.editorImported
                         from: 0
@@ -2563,6 +2841,7 @@ ApplicationWindow {
                     }
 
                     Text {
+                        visible: !root.beginnerMode
                         Layout.fillWidth: true
                         text: "Lower roughness creates a smoother surface. Higher roughness diffuses reflections."
                         color: "#6f6f6f"
@@ -2571,12 +2850,14 @@ ApplicationWindow {
                     }
 
                     Rectangle {
+                        visible: !root.beginnerMode
                         Layout.fillWidth: true
                         height: 1
                         color: root.borderColor
                     }
 
                     Text {
+                        visible: !root.beginnerMode
                         text: "LIGHTING"
                         color: "#bcbcbc"
                         font.pixelSize: 10
@@ -2585,6 +2866,7 @@ ApplicationWindow {
                     }
 
                     RowLayout {
+                        visible: !root.beginnerMode
                         Layout.fillWidth: true
                         Text { text: "Key light"; color: root.secondaryText; font.pixelSize: 10 }
                         Item { Layout.fillWidth: true }
@@ -2593,6 +2875,7 @@ ApplicationWindow {
 
                     Slider {
                         id: keyBrightnessSlider
+                        visible: !root.beginnerMode
                         Layout.fillWidth: true
                         from: 0
                         to: 4
@@ -2602,6 +2885,7 @@ ApplicationWindow {
                     }
 
                     RowLayout {
+                        visible: !root.beginnerMode
                         Layout.fillWidth: true
                         Text { text: "Fill light"; color: root.secondaryText; font.pixelSize: 10 }
                         Item { Layout.fillWidth: true }
@@ -2610,6 +2894,7 @@ ApplicationWindow {
 
                     Slider {
                         id: fillBrightnessSlider
+                        visible: !root.beginnerMode
                         Layout.fillWidth: true
                         from: 0
                         to: 150
@@ -2620,6 +2905,7 @@ ApplicationWindow {
 
                     ComboBox {
                         id: fillTintCombo
+                        visible: !root.beginnerMode
                         Layout.fillWidth: true
                         model: ["Neutral fill", "Warm fill", "Cool fill"]
                         onActivated: {
@@ -2634,12 +2920,14 @@ ApplicationWindow {
                     }
 
                     Rectangle {
+                        visible: !root.beginnerMode
                         Layout.fillWidth: true
                         height: 1
                         color: root.borderColor
                     }
 
                     Text {
+                        visible: !root.beginnerMode
                         text: "CAMERA"
                         color: "#bcbcbc"
                         font.pixelSize: 10
@@ -2648,6 +2936,7 @@ ApplicationWindow {
                     }
 
                     RowLayout {
+                        visible: !root.beginnerMode
                         Layout.fillWidth: true
                         Text { text: "Field of view"; color: root.secondaryText; font.pixelSize: 10 }
                         Item { Layout.fillWidth: true }
@@ -2656,6 +2945,7 @@ ApplicationWindow {
 
                     Slider {
                         id: cameraFovSlider
+                        visible: !root.beginnerMode
                         Layout.fillWidth: true
                         from: 25
                         to: 80
@@ -2677,7 +2967,9 @@ ApplicationWindow {
                             id: capabilityText
                             anchors.fill: parent
                             anchors.margins: 10
-                            text: "CURRENT BUILD\nEditable polygon meshes • indexed vertex editing • face extrusion • OBJ import/export • materials • transforms • scene files • viewport preview"
+                            text: root.beginnerMode
+                                  ? "QUICK TIP\nDrag a shape to move it. Right-drag the empty space to look around. Use the mouse wheel to zoom."
+                                  : "ADVANCED TOOLS\nEditable polygon meshes • vertex editing • extrusion and inset • OBJ import/export • materials • lighting • camera"
                             color: "#999999"
                             font.pixelSize: 10
                             lineHeight: 1.25
@@ -2727,5 +3019,9 @@ ApplicationWindow {
         createNewScene()
         editorReady = true
         clearHistory()
+        rememberWelcomeCheck.checked = !projectIO.welcomeChoiceMade()
+                                            || projectIO.hasSeenWelcome()
+        if (!projectIO.hasSeenWelcome())
+            Qt.callLater(introDialog.open)
     }
 }

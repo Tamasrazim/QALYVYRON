@@ -11,6 +11,7 @@
 #include <QRegularExpression>
 #include <QSaveFile>
 #include <QSet>
+#include <QSettings>
 #include <QTextStream>
 #include <QVector3D>
 
@@ -208,6 +209,25 @@ struct ExportObject
 ProjectIO::ProjectIO(QObject *parent)
     : QObject(parent)
 {
+}
+
+bool ProjectIO::hasSeenWelcome() const
+{
+    const QSettings settings;
+    return settings.value(QStringLiteral("interface/welcomeSeen"), false).toBool();
+}
+
+bool ProjectIO::welcomeChoiceMade() const
+{
+    const QSettings settings;
+    return settings.contains(QStringLiteral("interface/welcomeSeen"));
+}
+
+void ProjectIO::setHasSeenWelcome(bool seen) const
+{
+    QSettings settings;
+    settings.setValue(QStringLiteral("interface/welcomeSeen"), seen);
+    settings.sync();
 }
 
 QVariantMap ProjectIO::saveProject(const QUrl &url,

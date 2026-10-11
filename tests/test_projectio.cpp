@@ -1,6 +1,7 @@
 #include "projectio.h"
 
 #include <QFile>
+#include <QSettings>
 #include <QTemporaryDir>
 #include <QtTest>
 
@@ -14,6 +15,7 @@ private slots:
     void rejectsMalformedJson();
     void importsObjAndExportsWorldTransformedMeshes();
     void rejectsMalformedObjFaces();
+    void remembersWelcomePreference();
 };
 
 void ProjectIOTests::savesAndLoadsScene()
@@ -163,6 +165,33 @@ void ProjectIOTests::rejectsMalformedObjFaces()
     const QVariantMap result = io.importObj(QUrl::fromLocalFile(path));
     QVERIFY(!result.value(QStringLiteral("ok")).toBool());
     QVERIFY(!result.value(QStringLiteral("error")).toString().isEmpty());
+}
+
+void ProjectIOTests::remembersWelcomePreference()
+{
+    ProjectIO io;
+    QSettings settings;
+    const QString key = QStringLiteral("interface/welcomeSeen");
+    const bool hadPreviousValue = settings.contains(key);
+    const QVariant previousValue = settings.value(key);
+
+    settings.remove(key);
+    settings.sync();
+    QVERIFY(!io.welcomeChoiceMade());
+    QVERIFY(!io.hasSeenWelcome());
+
+    io.setHasSeenWelcome(true);
+    QVERIFY(io.welcomeChoiceMade());
+    QVERIFY(io.hasSeenWelcome());
+    io.setHasSeenWelcome(false);
+    QVERIFY(io.welcomeChoiceMade());
+    QVERIFY(!io.hasSeenWelcome());
+
+    if (hadPreviousValue)
+        settings.setValue(key, previousValue);
+    else
+        settings.remove(key);
+    settings.sync();
 }
 
 void ProjectIOTests::rejectsMalformedJson()
