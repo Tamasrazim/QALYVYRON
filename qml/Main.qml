@@ -368,6 +368,22 @@ ApplicationWindow {
         return selectedObject.geometry
     }
 
+    function selectMeshVertex(index) {
+        if (!selectedEditableGeometry())
+            return
+        vertexIndexSpinner.value = Math.max(0, Math.min(selectedObject.geometry.vertexCount - 1, index))
+        refreshMeshEditFields()
+        setStatus("Selected vertex " + vertexIndexSpinner.value + ".")
+    }
+
+    function selectMeshFace(index) {
+        if (!selectedEditableGeometry())
+            return
+        faceIndexSpinner.value = Math.max(0, Math.min(selectedObject.geometry.faceCount - 1, index))
+        refreshMeshEditFields()
+        setStatus("Selected face " + faceIndexSpinner.value + ".")
+    }
+
     function refreshMeshEditFields() {
         const geometry = selectedEditableGeometry()
         if (!geometry)
@@ -1582,6 +1598,90 @@ ApplicationWindow {
                                 root.orbitDistance = Math.max(190, Math.min(1050,
                                     root.orbitDistance - event.angleDelta.y * 0.35))
                                 root.updateCamera()
+                            }
+                        }
+
+                        // Clickable screen-space handles make the first mesh tools
+                        // usable directly in the viewport rather than only by index.
+                        Repeater {
+                            id: meshVertexHandles
+                            model: meshEditDialog.visible && root.selectedEditableGeometry()
+                                   ? root.selectedEditableGeometry().vertexCount : 0
+
+                            delegate: Rectangle {
+                                required property int index
+                                readonly property var projectedPosition: {
+                                    if (!root.selectedObject || !root.selectedEditableGeometry())
+                                        return Qt.vector3d(-1000, -1000, -1)
+                                    const local = root.selectedObject.geometry.vertexPosition(index)
+                                    const scene = root.selectedObject.mapPositionToScene(local)
+                                    return view3d.mapFrom3DScene(scene)
+                                }
+                                width: index === vertexIndexSpinner.value ? 13 : 9
+                                height: width
+                                radius: width / 2
+                                x: projectedPosition.x - width / 2
+                                y: projectedPosition.y - height / 2
+                                z: 30
+                                visible: meshEditDialog.visible
+                                         && root.selectedObject !== null
+                                         && !root.selectedObject.editorImported
+                                         && projectedPosition.z >= 0
+                                         && projectedPosition.x >= 0
+                                         && projectedPosition.x <= view3d.width
+                                         && projectedPosition.y >= 0
+                                         && projectedPosition.y <= view3d.height
+                                color: index === vertexIndexSpinner.value ? "#ffffff" : "#d0d0d0"
+                                border.color: "#111111"
+                                border.width: 1
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    acceptedButtons: Qt.LeftButton
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.selectMeshVertex(index)
+                                }
+                            }
+                        }
+
+                        Repeater {
+                            id: meshFaceHandles
+                            model: meshEditDialog.visible && root.selectedEditableGeometry()
+                                   ? root.selectedEditableGeometry().faceCount : 0
+
+                            delegate: Rectangle {
+                                required property int index
+                                readonly property var projectedPosition: {
+                                    if (!root.selectedObject || !root.selectedEditableGeometry())
+                                        return Qt.vector3d(-1000, -1000, -1)
+                                    const local = root.selectedObject.geometry.faceCenter(index)
+                                    const scene = root.selectedObject.mapPositionToScene(local)
+                                    return view3d.mapFrom3DScene(scene)
+                                }
+                                width: index === faceIndexSpinner.value ? 15 : 10
+                                height: width
+                                radius: 2
+                                x: projectedPosition.x - width / 2
+                                y: projectedPosition.y - height / 2
+                                z: 29
+                                visible: meshEditDialog.visible
+                                         && root.selectedObject !== null
+                                         && !root.selectedObject.editorImported
+                                         && projectedPosition.z >= 0
+                                         && projectedPosition.x >= 0
+                                         && projectedPosition.x <= view3d.width
+                                         && projectedPosition.y >= 0
+                                         && projectedPosition.y <= view3d.height
+                                color: index === faceIndexSpinner.value ? "#818181" : "#4c4c4c"
+                                border.color: "#eeeeee"
+                                border.width: 1
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    acceptedButtons: Qt.LeftButton
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.selectMeshFace(index)
+                                }
                             }
                         }
 
