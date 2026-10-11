@@ -64,6 +64,8 @@ class FinalRendererTests final : public QObject
 
 private slots:
     void rejectsInvalidRenderDimensions();
+    void rejectsUnsafeRenderWorkloads();
+    void cancelledRenderDoesNotWritePartialOutput();
     void writesPngFromSceneGeometry();
 };
 
@@ -82,6 +84,43 @@ void FinalRendererTests::rejectsInvalidRenderDimensions()
 
     QVERIFY(!renderer.startRender(output, smallPlaneScene(), 8192, 8192, 1, 0));
     QVERIFY(!renderer.startRender(output, smallPlaneScene(), 32, 32, 0, 0));
+}
+
+void FinalRendererTests::rejectsUnsafeRenderWorkloads()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    FinalRenderer renderer;
+    const QUrl output = QUrl::fromLocalFile(
+        directory.filePath(QStringLiteral("too-expensive.png")));
+
+    QVERIFY(!renderer.startRender(output, smallPlaneScene(), 1920, 1080, 64, 4));
+    QVERIFY(!renderer.startRender(output, smallPlaneScene(), 64, 64, 1, 5));
+    QVERIFY(!renderer.busy());
+    QVERIFY(!QFileInfo::exists(output.toLocalFile()));
+}
+
+void FinalRendererTests::cancelledRenderDoesNotWritePartialOutput()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    FinalRenderer renderer;
+    QSignalSpy finished(&renderer, &FinalRenderer::renderFinished);
+    QVERIFY(finished.isValid());
+
+    const QString path = directory.filePath(QStringLiteral("cancelled-render.png"));
+    QVERIFY(renderer.startRender(QUrl::fromLocalFile(path),
+                                 smallPlaneScene(), 640, 360, 16, 3));
+    renderer.cancelRender();
+
+    QTRY_VERIFY_WITH_TIMEOUT(!finished.isEmpty(), 10000);
+    const QList<QVariant> result = finished.takeFirst();
+    QVERIFY(!result.at(0).toBool());
+    QVERIFY(result.at(1).toString().contains(QStringLiteral("cancel"), Qt::CaseInsensitive));
+    QVERIFY(!QFileInfo::exists(path));
+    QVERIFY(!renderer.busy());
 }
 
 void FinalRendererTests::writesPngFromSceneGeometry()
