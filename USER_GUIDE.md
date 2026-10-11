@@ -22,11 +22,12 @@ Use the inspector's numeric position, rotation, and scale fields when you need e
 Select a cube, sphere, cylinder, cone, or plane, then click **Edit Selected Mesh**. The early mesh editor supports two actual topology operations:
 
 1. **Vertex coordinates:** choose a vertex index and edit its X, Y, or Z coordinate. The selected vertex is marked in the viewport.
-2. **Face extrusion:** choose a face index, enter a non-zero distance, and click **Extrude Face**. A new cap and side faces are added to the mesh; the selected face center is marked in the viewport.
+2. **Face extrusion:** click a face-center marker or choose its index, enter a non-zero distance, and click **Extrude Face**. A new cap and side faces are added to the mesh.
+3. **Face inset:** select a convex planar face, enter a positive inset distance, and click **Inset Face**. The selected face is shrunk by offsetting its edges and adding a surrounding ring. Excessive insets and non-convex or warped faces are rejected.
 
 The vertex and face indices are shown as zero-based values. The editor also displays the selected face's center and normal. Mesh data is stored in the scene file, restored when the project opens, and included when you duplicate a built-in mesh. Undo and redo checkpoints include the mesh topology.
 
-This is the first usable slice of mesh editing, not a complete Blender-style Edit Mode. Direct mouse selection of individual vertices, edges, and faces, plus bevel, inset, merge, loop selection, and advanced topology tools, are still missing.
+This is still an early mesh editor, not a complete Blender-style Edit Mode. Vertex and face-center markers are clickable; full edge selection, bevel, merge, loop selection, multi-selection, and advanced topology tools are still missing.
 
 ## Import a 3D asset
 
@@ -38,7 +39,7 @@ Choose **Import 3D Asset** and select a local:
 
 OBJ and glTF use different import paths:
 
-- **Wavefront OBJ:** QALYVYRON parses the vertex positions and polygon faces into its own editable mesh data. The imported geometry is embedded in the `.qvscene` file, so the original OBJ is no longer needed to reopen that mesh. It can be edited through **Edit Selected Mesh** and written back out through **Export OBJ**.
+- **Wavefront OBJ:** QALYVYRON parses vertex positions and polygon faces into its own editable mesh data. The imported geometry is embedded in the `.qvscene` file, so the original OBJ is no longer needed to reopen that mesh. It can be edited through **Edit Selected Mesh** and written back out through **Export OBJ**.
 - **glTF 2.0 (.glb/.gltf):** loaded by Qt Quick 3D's runtime loader for preview and placement. This path remains read-only and stores the source file's local URL. Keep the source file and its dependent assets in the same location when reopening the scene.
 
 The current OBJ importer is geometry-only. It does not yet preserve texture coordinates, imported normals, MTL material libraries, or textures. Full material/texture preservation and asset collection are still planned.
