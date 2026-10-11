@@ -12,7 +12,7 @@ set(CMAKE_AUTOMOC ON)
 
 include(CTest)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS
+find_package(Qt6 6.4 REQUIRED COMPONENTS
     Quick
     QuickControls2
     Quick3D
@@ -20,7 +20,7 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS
     Test
 )
 
-qt_standard_project_setup(REQUIRES 6.5)
+qt_standard_project_setup(REQUIRES 6.4)
 
 qt_add_executable(QALYVYRON
     src/main.cpp
@@ -29,6 +29,8 @@ qt_add_executable(QALYVYRON
 )
 
 target_include_directories(QALYVYRON PRIVATE include)
+
+set_source_files_properties(qml/Main.qml PROPERTIES QT_RESOURCE_ALIAS Main.qml)
 
 qt_add_qml_module(QALYVYRON
     URI Qalyvyron
