@@ -110,6 +110,7 @@ void EditableGeometryTests::deleteFaceRemovesSurfaceAndCompactsVertices()
     QCOMPARE(cube.vertexCount(), 8);
 
     EditableGeometry plane;
+    plane.setShape(QStringLiteral("Plane"));
     const QVariantMap before = plane.serializeMesh();
     QVERIFY(!plane.deleteFace(0)); // Keep at least one face in a mesh.
     QCOMPARE(plane.serializeMesh(), before);
