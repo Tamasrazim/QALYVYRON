@@ -17,6 +17,7 @@ constexpr int kCylinderSegments = 32;
 constexpr int kSphereSegments = 32;
 constexpr int kSphereLatitudeBands = 16;
 constexpr float kEpsilon = 1.0e-5f;
+constexpr qint64 kMaximumRenderedVertices = 1000000;
 
 bool finiteVector(const QVector3D &value)
 {
