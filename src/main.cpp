@@ -5,6 +5,7 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
+#include <QUrl>
 
 int main(int argc, char *argv[])
 {
@@ -26,6 +27,6 @@ int main(int argc, char *argv[])
         []() { QCoreApplication::exit(EXIT_FAILURE); },
         Qt::QueuedConnection);
 
-    engine.loadFromModule(QStringLiteral("Qalyvyron"), QStringLiteral("Main"));
+    engine.load(QUrl(QStringLiteral("qrc:/qt/qml/Qalyvyron/Main.qml")));
     return application.exec();
 }
