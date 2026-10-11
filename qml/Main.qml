@@ -102,6 +102,7 @@ ApplicationWindow {
 
     function refreshInspector() {
         if (!selectedObject || selectedIndex < 0) {
+            objectNameField.text = ""
             xField.text = "0"
             yField.text = "0"
             zField.text = "0"
@@ -114,6 +115,7 @@ ApplicationWindow {
             return
         }
 
+        objectNameField.text = selectedObject.editorLabel
         const p = selectedObject.position
         const r = selectedObject.eulerRotation
         xField.text = Number(p.x).toFixed(2)
@@ -253,6 +255,25 @@ ApplicationWindow {
         objectList.setProperty(selectedIndex, "roughness", roughness)
     }
 
+    function duplicateSelected() {
+        if (!selectedObject || selectedIndex < 0)
+            return
+
+        const row = objectList.get(selectedIndex)
+        addPrimitive(row.shape, {
+            label: row.label + " Copy",
+            x: row.x + 125,
+            y: row.y,
+            z: row.z,
+            rx: row.rx,
+            ry: row.ry,
+            rz: row.rz,
+            scale: row.scale,
+            color: row.color,
+            roughness: row.roughness
+        })
+    }
+
     function removeSelected() {
         if (!selectedObject || selectedIndex < 0)
             return
@@ -298,6 +319,11 @@ ApplicationWindow {
         orbitYaw = 34
         orbitPitch = 23
         orbitDistance = 470
+        camera.fieldOfView = 45
+        keyLight.brightness = 1.7
+        fillLight.brightness = 65
+        fillLight.color = "#ffffff"
+        fillTintCombo.currentIndex = 0
         updateCamera()
         setStatus("New scene ready.")
     }
@@ -322,12 +348,56 @@ ApplicationWindow {
             format: "qalyvyron.scene",
             version: 1,
             title: "QALYVYRON Scene",
+            settings: {
+                cameraFov: camera.fieldOfView,
+                keyLightBrightness: keyLight.brightness,
+                fillLightBrightness: fillLight.brightness,
+                fillTintIndex: fillTintCombo.currentIndex,
+                orbitYaw: root.orbitYaw,
+                orbitPitch: root.orbitPitch,
+                orbitDistance: root.orbitDistance
+            },
             objects: serializedObjects
         }
     }
 
     function applyProject(document) {
         clearScene()
+
+        // Start with known defaults so older scene files remain predictable.
+        camera.fieldOfView = 45
+        keyLight.brightness = 1.7
+        fillLight.brightness = 65
+        fillLight.color = "#ffffff"
+        fillTintCombo.currentIndex = 0
+        orbitYaw = 34
+        orbitPitch = 23
+        orbitDistance = 470
+
+        const settings = document.settings || ({})
+        if (settings.cameraFov !== undefined && Number.isFinite(Number(settings.cameraFov)))
+            camera.fieldOfView = Math.max(25, Math.min(80, Number(settings.cameraFov)))
+        if (settings.keyLightBrightness !== undefined && Number.isFinite(Number(settings.keyLightBrightness)))
+            keyLight.brightness = Math.max(0, Math.min(4, Number(settings.keyLightBrightness)))
+        if (settings.fillLightBrightness !== undefined && Number.isFinite(Number(settings.fillLightBrightness)))
+            fillLight.brightness = Math.max(0, Math.min(150, Number(settings.fillLightBrightness)))
+        if (settings.fillTintIndex !== undefined) {
+            const tintIndex = Math.max(0, Math.min(2, Number(settings.fillTintIndex) || 0))
+            fillTintCombo.currentIndex = tintIndex
+            if (tintIndex === 1)
+                fillLight.color = "#ffd6ad"
+            else if (tintIndex === 2)
+                fillLight.color = "#b8d6ff"
+            else
+                fillLight.color = "#ffffff"
+        }
+        if (settings.orbitYaw !== undefined && Number.isFinite(Number(settings.orbitYaw)))
+            orbitYaw = Number(settings.orbitYaw)
+        if (settings.orbitPitch !== undefined && Number.isFinite(Number(settings.orbitPitch)))
+            orbitPitch = Math.max(-80, Math.min(80, Number(settings.orbitPitch)))
+        if (settings.orbitDistance !== undefined && Number.isFinite(Number(settings.orbitDistance)))
+            orbitDistance = Math.max(190, Math.min(1050, Number(settings.orbitDistance)))
+
         const savedObjects = document.objects || []
         for (let i = 0; i < savedObjects.length; ++i) {
             const entry = savedObjects[i]
@@ -339,6 +409,7 @@ ApplicationWindow {
         if (objectList.count === 0)
             addPrimitive("Cube", {label: "Cube 1"})
 
+        updateCamera()
         selectObject(objectList.get(0).objectId)
         setStatus("Opened scene: " + savedObjects.length + " object(s).")
     }
@@ -644,6 +715,13 @@ ApplicationWindow {
                             color: "#666666"
                             font.pixelSize: 11
                         }
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        text: "Duplicate Selected"
+                        enabled: root.selectedIndex >= 0
+                        onClicked: root.duplicateSelected()
                     }
 
                     Button {
@@ -1098,6 +1176,29 @@ ApplicationWindow {
                         text: root.selectedObject ? root.selectedObject.editorLabel : "Nothing selected"
                         color: root.secondaryText
                         font.pixelSize: 11
+                    }
+
+                    TextField {
+                        id: objectNameField
+                        Layout.fillWidth: true
+                        text: ""
+                        placeholderText: "Object name"
+                        enabled: root.selectedObject !== null
+                        selectByMouse: true
+                        onEditingFinished: {
+                            if (!root.selectedObject || root.selectedIndex < 0)
+                                return
+
+                            const newName = text.trim()
+                            if (newName.length === 0) {
+                                text = root.selectedObject.editorLabel
+                                return
+                            }
+
+                            root.selectedObject.editorLabel = newName
+                            objectList.setProperty(root.selectedIndex, "label", newName)
+                            root.setStatus("Renamed object to " + newName + ".")
+                        }
                     }
 
                     Rectangle {
