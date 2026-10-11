@@ -1,67 +1,96 @@
 # QALYVYRON Roadmap
 
-The milestones describe intended work, not claims that those features have shipped. Each stage should have a runnable build and verifiable acceptance checks.
+The target is a **usable, independent desktop alternative to Blender for everyday 3D work**, not a visual mockup or a viewport-only demo. Milestones describe required working behavior. A feature is not complete merely because a button, panel, or data structure exists.
 
-## Stage 0 — Foundation
+## Current state
 
-- [x] Create the public repository and project overview.
-- [x] Establish a Qt 6 desktop application and native scene-file I/O layer.
-- [ ] Build on a clean machine in CI.
-- [ ] Verify supported Qt versions, graphics backends, and operating systems.
+QALYVYRON is an early prototype. It already has a Qt Quick 3D viewport, primitive scene objects, basic object transforms, a hierarchy, primitive material controls, camera/light settings, versioned scene files and viewport-preview export. Bounded undo/redo and local OBJ/glTF import have now been added to the implementation, but they still need a green build and runtime smoke tests before being treated as validated features.
 
-## Stage 1 — First usable 3D workspace
+## Stage 1 — Dependable scene workspace
 
-- [ ] Real-time 3D viewport with camera orbit and zoom.
-- [ ] Create and delete primitive meshes through visible controls.
-- [ ] Select scene objects from the viewport or hierarchy.
-- [ ] Edit position, rotation, scale, and material color.
-- [ ] Save and reopen versioned scene files.
-- [ ] Export a viewport preview to PNG.
-- [ ] Undo and redo common scene operations.
-- [ ] Automated smoke tests and a reproducible developer build.
+- [x] Establish the C++/Qt 6 application and versioned local scene-file I/O.
+- [x] Add a real-time 3D viewport and common primitives.
+- [x] Add hierarchy selection, rename, duplicate, delete, and numeric transform editing.
+- [x] Add basic primitive material, camera and light controls.
+- [x] Export a PNG of the viewport, labelled as a preview rather than a final render.
+- [x] Add bounded undo/redo checkpoints for common scene edits in the current implementation.
+- [x] Add initial local OBJ and glTF 2.0 loading using Qt Quick 3D AssetUtils.
+- [ ] Pass current Linux and Windows CI jobs.
+- [ ] Run an application-level smoke test on a clean Windows machine and supported graphics hardware.
+- [ ] Verify undo/redo for each supported command, including mouse drags and save/reopen behavior.
+- [ ] Ensure failed file loads leave the prior scene intact and give a clear message.
 
-**Acceptance:** a user can create a small scene, customize it, save it, reopen it, and export a preview without launching Blender.
+**Acceptance:** create a scene, add and transform several objects, undo and redo edits, save, fully close the app, reopen the project, and export a preview without Blender or network access. Imported source assets must still be available locally.
 
-## Stage 2 — Modeling and scene editing
+## Stage 2 — Actual polygon modeling
 
-- Mesh selection and editing tools.
-- Extrude, bevel, subdivision, and non-destructive modifiers.
-- Collections, hierarchy, naming, visibility, and reusable assets.
-- Object snapping, numeric transforms, and discoverable transform handles.
-- Import/export for glTF 2.0, with format limitations displayed clearly.
+This stage is what separates a scene viewer from a practical 3D creation tool.
 
-## Stage 3 — Materials and lighting
+- [ ] Implement a persistent mesh data model with vertices, edges, faces, normals, and topology validation.
+- [ ] Add object mode and mesh-edit mode with visible vertex, edge, and face selection.
+- [ ] Implement move, rotate, scale, extrude, inset, bevel, merge, delete, and face creation.
+- [ ] Add snapping, pivot modes, transform gizmos, numeric operations, and reliable selection.
+- [ ] Add subdivision and non-destructive modifier stacks with editable parameters.
+- [ ] Make mesh operations undoable and test them against invalid or degenerate geometry.
+- [ ] Save mesh topology in the native project format and migrate older projects safely.
 
-- Principled material inspector and texture input.
-- Point, spot, directional, and area lights.
-- Environment lighting, shadow controls, and camera framing.
-- Clear separation of real-time preview quality and final-render quality.
+**Acceptance:** build a non-trivial mesh from primitives, edit its topology, save it, reopen it, and continue editing without losing topology or material assignments.
 
-## Stage 4 — Animation
+## Stage 3 — Asset interoperability
 
-- Timeline, keyframes, playback, and interpolation.
-- Object and camera animation.
-- Rendered image sequences and video output.
-- Render queue progress, cancellation, and recoverable failures.
+- [ ] Complete robust OBJ and glTF 2.0 import with materials, textures, hierarchy, transforms, and useful error reporting.
+- [ ] Export edited meshes to tested standard formats, initially glTF 2.0 and OBJ.
+- [ ] Add asset collection/relocation so a project can be moved to another folder or machine without broken paths.
+- [ ] Validate file size, formats, texture paths, and malformed inputs before allocating large resources.
+- [ ] Test round-trip import/export with reference assets and image comparisons.
 
-## Stage 5 — Higher-quality rendering
+**Acceptance:** import a real asset, edit it, save a self-contained project, export it, and verify that the exported asset opens in an independent viewer.
 
-- Modular rendering backend with documented capability and hardware requirements.
-- Improved global illumination, reflections, denoising, and sampling controls.
-- Performance profiling and repeatable image-based regression tests.
-- Memory limits, crash recovery, and useful render diagnostics.
+## Stage 4 — Production materials, lighting, and final rendering
 
-## Stage 6 — Packaging and production hardening
+- [ ] Add a principled PBR material editor with editable roughness, metallic, alpha, normal, and texture inputs.
+- [ ] Add UV coordinates and a practical UV editing workflow.
+- [ ] Support camera composition, multiple light types, shadows, and environment lighting.
+- [ ] Design and integrate a dedicated final-render backend; do not present viewport screenshots as final renders.
+- [ ] Add sampling, render resolution, denoising, output format, progress, cancellation, and recovery.
+- [ ] Add repeatable render tests for geometry, materials, lighting, color handling, and image output.
 
-- Signed installer and application packaging for supported platforms.
-- Import/export compatibility testing.
-- Accessibility, localization, and input-device testing.
-- Project format migration tests and complete user documentation.
+**Acceptance:** render a saved scene at a user-selected resolution to a real output image, with reproducible settings and error messages for unsupported hardware or failed renders.
 
-## Non-negotiable constraints
+## Stage 5 — Animation
 
-- The application must not require Blender to be installed or running.
-- UI controls must do real work; unfinished functions must be marked as unavailable.
-- Saving must not silently overwrite a project without following the chosen save workflow.
-- Opening a scene file must validate format, version, and size before loading.
-- No milestone is complete until its acceptance criteria have been exercised.
+- [ ] Add a timeline, keyframes, interpolation curves, playback, and visible frame/range controls.
+- [ ] Animate object transforms and camera properties.
+- [ ] Save/reopen animation data and support undo/redo for keyframes.
+- [ ] Render animation to numbered image sequences.
+- [ ] Add a local video-export workflow with progress, cancellation, and recovery.
+
+**Acceptance:** animate a scene, reopen the project, render a frame range, and export a complete sequence/video without manual frame-by-frame workarounds.
+
+## Stage 6 — Broader creative tools
+
+- [ ] Improve sculpting and high-resolution mesh workflows.
+- [ ] Add rigging and skeletal animation where feasible.
+- [ ] Add particles, simple simulations, and additional modifier types.
+- [ ] Add a compositor or equivalent post-processing graph.
+- [ ] Add asset libraries, reusable scene elements, and practical project templates.
+
+These capabilities are planned only after the core modeling, asset, rendering, and animation paths are stable.
+
+## Stage 7 — Release quality
+
+- [ ] Produce a repeatable Windows x64 build and a tested portable package/installer.
+- [ ] Add crash logs, autosave/recovery, project backups, and safe format migrations.
+- [ ] Test GPU and fallback paths, display scaling, large scenes, and memory pressure.
+- [ ] Document supported hardware, formats, limitations, license terms, and offline behavior.
+- [ ] Publish a release only after clean-machine installation and a complete real-project test.
+
+## Product constraints
+
+- No Blender installation, Blender runtime, subscription, account, or cloud service should be required.
+- Most common operations must be discoverable in the UI; shortcuts may accelerate them but must not be mandatory.
+- Project editing and supported rendering should work offline.
+- Do not label an unimplemented control as working.
+- Scene files and source assets must be handled safely; failures should not silently erase work.
+- Keep the interface monochrome while allowing unrestricted colors in the 3D scene.
+- Every release milestone needs evidence from a real build and an exercised workflow, not only a code review.
