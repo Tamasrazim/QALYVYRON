@@ -32,6 +32,11 @@ ApplicationWindow {
     property real gizmoY: 0
     property real gizmoDepth: 1
     property bool gizmoVisible: false
+    property var undoStack: []
+    property var redoStack: []
+    property int historyLimit: 80
+    property bool historyLocked: false
+    property bool editorReady: false
 
     ListModel {
         id: objectList
@@ -40,6 +45,64 @@ ApplicationWindow {
     function setStatus(message) {
         statusLabel.text = message
         statusTimer.restart()
+    }
+
+    // Bounded snapshots make common scene edits reversible without retaining
+    // destroyed Qt objects or allowing the history to grow without limit.
+    function historySnapshot() {
+        return JSON.parse(JSON.stringify(serializeScene()))
+    }
+
+    function pushUndoSnapshot() {
+        if (historyLocked)
+            return
+
+        const stack = undoStack.slice()
+        stack.push(historySnapshot())
+        if (stack.length > historyLimit)
+            stack.shift()
+        undoStack = stack
+        redoStack = []
+    }
+
+    function clearHistory() {
+        undoStack = []
+        redoStack = []
+    }
+
+    function undo() {
+        if (undoStack.length === 0)
+            return
+
+        const target = undoStack[undoStack.length - 1]
+        const current = historySnapshot()
+        undoStack = undoStack.slice(0, -1)
+        redoStack = redoStack.concat([current])
+        historyLocked = true
+        applyProject(target)
+        historyLocked = false
+        setStatus("Undid the previous edit.")
+    }
+
+    function redo() {
+        if (redoStack.length === 0)
+            return
+
+        const target = redoStack[redoStack.length - 1]
+        const current = historySnapshot()
+        redoStack = redoStack.slice(0, -1)
+        undoStack = undoStack.concat([current])
+        if (undoStack.length > historyLimit)
+            undoStack = undoStack.slice(undoStack.length - historyLimit)
+        historyLocked = true
+        applyProject(target)
+        historyLocked = false
+        setStatus("Restored the edit.")
+    }
+
+    function createPrimitive(shape) {
+        pushUndoSnapshot()
+        addPrimitive(shape)
     }
 
     function meshSource(shape) {
@@ -204,6 +267,7 @@ ApplicationWindow {
             return
         }
 
+        pushUndoSnapshot()
         const p = selectedObject.position
         const r = selectedObject.eulerRotation
         let x = p.x, y = p.y, z = p.z
@@ -239,6 +303,7 @@ ApplicationWindow {
         if (!selectedObject || selectedIndex < 0)
             return
 
+        pushUndoSnapshot()
         const palette = ["#c8c8c8", "#f2f2f2", "#555555", "#df5b57", "#508bdc", "#d8ae57"]
         const colorValue = palette[Math.max(0, Math.min(palette.length - 1, index))]
         selectedObject.editorColor = colorValue
@@ -259,6 +324,7 @@ ApplicationWindow {
         if (!selectedObject || selectedIndex < 0)
             return
 
+        pushUndoSnapshot()
         const row = objectList.get(selectedIndex)
         addPrimitive(row.shape, {
             label: row.label + " Copy",
@@ -278,6 +344,7 @@ ApplicationWindow {
         if (!selectedObject || selectedIndex < 0)
             return
 
+        pushUndoSnapshot()
         const removedName = selectedObject.editorLabel
         const removedId = selectedObject.editorId
         selectedObject.destroy()
@@ -313,6 +380,9 @@ ApplicationWindow {
     }
 
     function createNewScene() {
+        if (editorReady)
+            pushUndoSnapshot()
+
         clearScene()
         addPrimitive("Cube", {id: "object-1", label: "Cube 1", x: -60, y: 0, z: 0, scale: 1, color: "#c8c8c8"})
         addPrimitive("Sphere", {id: "object-2", label: "Sphere 2", x: 65, y: 0, z: 0, scale: 1, color: "#508bdc"})
@@ -362,6 +432,8 @@ ApplicationWindow {
     }
 
     function applyProject(document) {
+        const previousHistoryLock = historyLocked
+        historyLocked = true
         clearScene()
 
         // Start with known defaults so older scene files remain predictable.
@@ -411,6 +483,7 @@ ApplicationWindow {
 
         updateCamera()
         selectObject(objectList.get(0).objectId)
+        historyLocked = previousHistoryLock
         setStatus("Opened scene: " + savedObjects.length + " object(s).")
     }
 
@@ -478,10 +551,12 @@ ApplicationWindow {
 
         onAccepted: {
             const result = projectIO.loadProject(selectedFile)
-            if (result.ok)
+            if (result.ok) {
+                root.clearHistory()
                 root.applyProject(result.data)
-            else
+            } else {
                 root.setStatus("Open failed: " + result.error)
+            }
         }
     }
 
@@ -554,6 +629,16 @@ ApplicationWindow {
                     text: "Save"
                     onClicked: saveSceneDialog.open()
                 }
+                Button {
+                    text: "Undo"
+                    enabled: root.undoStack.length > 0
+                    onClicked: root.undo()
+                }
+                Button {
+                    text: "Redo"
+                    enabled: root.redoStack.length > 0
+                    onClicked: root.redo()
+                }
 
                 Item { Layout.fillWidth: true }
 
@@ -605,27 +690,27 @@ ApplicationWindow {
                         Button {
                             Layout.fillWidth: true
                             text: "+ Cube"
-                            onClicked: root.addPrimitive("Cube")
+                            onClicked: root.createPrimitive("Cube")
                         }
                         Button {
                             Layout.fillWidth: true
                             text: "+ Sphere"
-                            onClicked: root.addPrimitive("Sphere")
+                            onClicked: root.createPrimitive("Sphere")
                         }
                         Button {
                             Layout.fillWidth: true
                             text: "+ Cylinder"
-                            onClicked: root.addPrimitive("Cylinder")
+                            onClicked: root.createPrimitive("Cylinder")
                         }
                         Button {
                             Layout.fillWidth: true
                             text: "+ Cone"
-                            onClicked: root.addPrimitive("Cone")
+                            onClicked: root.createPrimitive("Cone")
                         }
                         Button {
                             Layout.fillWidth: true
                             text: "+ Plane"
-                            onClicked: root.addPrimitive("Plane")
+                            onClicked: root.createPrimitive("Plane")
                         }
                     }
 
@@ -856,12 +941,17 @@ ApplicationWindow {
                             property var dragStartPoint: Qt.vector3d(0, 0, 0)
                             cursorShape: orbiting ? Qt.ClosedHandCursor : movingSelection ? Qt.SizeAllCursor : Qt.ArrowCursor
 
+                            property bool dragHistorySaved: false
+
                             onPressed: function(mouse) {
                                 lastX = mouse.x
                                 lastY = mouse.y
                                 orbiting = mouse.button === Qt.RightButton
                                 movingSelection = false
                                 movingObject = null
+                                dragHistorySaved = false
+                                if (orbiting)
+                                    root.pushUndoSnapshot()
 
                                 if (mouse.button !== Qt.LeftButton)
                                     return
@@ -899,6 +989,11 @@ ApplicationWindow {
                                 if (!movingSelection || !movingObject)
                                     return
 
+                                if (!dragHistorySaved) {
+                                    root.pushUndoSnapshot()
+                                    dragHistorySaved = true
+                                }
+
                                 const point = view3d.mapTo3DScene(
                                     Qt.vector3d(mouse.x, mouse.y, selectionDepth))
                                 const start = dragStartPosition
@@ -921,6 +1016,7 @@ ApplicationWindow {
                                 orbiting = false
                                 movingSelection = false
                                 movingObject = null
+                                dragHistorySaved = false
                                 Qt.callLater(root.updateGizmo)
                             }
 
@@ -939,6 +1035,7 @@ ApplicationWindow {
                         WheelHandler {
                             acceptedDevices: PointerDevice.Mouse
                             onWheel: function(event) {
+                                root.pushUndoSnapshot()
                                 root.orbitDistance = Math.max(190, Math.min(1050,
                                     root.orbitDistance - event.angleDelta.y * 0.35))
                                 root.updateCamera()
@@ -1007,8 +1104,10 @@ ApplicationWindow {
                                 property var dragObject: null
                                 property var initialObjectPosition: Qt.vector3d(0, 0, 0)
                                 property var initialPointerPosition: Qt.vector3d(0, 0, 0)
+                                property bool historySaved: false
 
                                 onPressed: function(mouse) {
+                                    historySaved = false
                                     dragObject = root.selectedObject
                                     if (!dragObject)
                                         return
@@ -1023,6 +1122,10 @@ ApplicationWindow {
                                 onPositionChanged: function(mouse) {
                                     if (!pressed || !dragObject)
                                         return
+                                    if (!historySaved) {
+                                        root.pushUndoSnapshot()
+                                        historySaved = true
+                                    }
                                     const pointer = view3d.mapTo3DScene(Qt.vector3d(
                                         transformGizmo.x + mouse.x,
                                         transformGizmo.y + mouse.y,
@@ -1045,6 +1148,7 @@ ApplicationWindow {
 
                                 onReleased: {
                                     dragObject = null
+                                    historySaved = false
                                     root.updateGizmo()
                                 }
                             }
@@ -1195,6 +1299,8 @@ ApplicationWindow {
                                 return
                             }
 
+                            root.pushUndoSnapshot()
+                            root.pushUndoSnapshot()
                             root.selectedObject.editorLabel = newName
                             objectList.setProperty(root.selectedIndex, "label", newName)
                             root.setStatus("Renamed object to " + newName + ".")
@@ -1363,6 +1469,7 @@ ApplicationWindow {
                         from: 0
                         to: 1
                         value: 0.38
+                        onPressedChanged: if (pressed) root.pushUndoSnapshot()
                         onMoved: root.setMaterialRoughness(value)
                     }
 
@@ -1401,6 +1508,7 @@ ApplicationWindow {
                         from: 0
                         to: 4
                         value: keyLight.brightness
+                        onPressedChanged: if (pressed) root.pushUndoSnapshot()
                         onMoved: keyLight.brightness = value
                     }
 
@@ -1417,6 +1525,7 @@ ApplicationWindow {
                         from: 0
                         to: 150
                         value: fillLight.brightness
+                        onPressedChanged: if (pressed) root.pushUndoSnapshot()
                         onMoved: fillLight.brightness = value
                     }
 
@@ -1425,6 +1534,7 @@ ApplicationWindow {
                         Layout.fillWidth: true
                         model: ["Neutral fill", "Warm fill", "Cool fill"]
                         onActivated: {
+                            root.pushUndoSnapshot()
                             if (currentIndex === 0)
                                 fillLight.color = "#ffffff"
                             else if (currentIndex === 1)
@@ -1461,6 +1571,7 @@ ApplicationWindow {
                         from: 25
                         to: 80
                         value: camera.fieldOfView
+                        onPressedChanged: if (pressed) root.pushUndoSnapshot()
                         onMoved: camera.fieldOfView = value
                     }
 
@@ -1523,5 +1634,9 @@ ApplicationWindow {
         }
     }
 
-    Component.onCompleted: createNewScene()
+    Component.onCompleted: {
+        createNewScene()
+        editorReady = true
+        clearHistory()
+    }
 }
