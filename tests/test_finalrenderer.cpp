@@ -76,12 +76,12 @@ void FinalRendererTests::rejectsInvalidRenderDimensions()
     const QUrl output = QUrl::fromLocalFile(
         directory.filePath(QStringLiteral("invalid.png")));
 
-    QVERIFY(!renderer.startRender(output, smallPlaneScene(), 0, 32, 1));
+    QVERIFY(!renderer.startRender(output, smallPlaneScene(), 0, 32, 1, 0));
     QVERIFY(!renderer.busy());
     QVERIFY(!QFileInfo::exists(output.toLocalFile()));
 
-    QVERIFY(!renderer.startRender(output, smallPlaneScene(), 8192, 8192, 1));
-    QVERIFY(!renderer.startRender(output, smallPlaneScene(), 32, 32, 0));
+    QVERIFY(!renderer.startRender(output, smallPlaneScene(), 8192, 8192, 1, 0));
+    QVERIFY(!renderer.startRender(output, smallPlaneScene(), 32, 32, 0, 0));
 }
 
 void FinalRendererTests::writesPngFromSceneGeometry()
@@ -95,7 +95,7 @@ void FinalRendererTests::writesPngFromSceneGeometry()
 
     const QString path = directory.filePath(QStringLiteral("final-render.png"));
     QVERIFY(renderer.startRender(QUrl::fromLocalFile(path),
-                                 smallPlaneScene(), 48, 48, 2));
+                                 smallPlaneScene(), 48, 48, 2, 1));
 
     QTRY_VERIFY_WITH_TIMEOUT(!finished.isEmpty(), 10000);
     const QList<QVariant> result = finished.takeFirst();
