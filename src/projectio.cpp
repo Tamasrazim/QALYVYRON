@@ -384,11 +384,11 @@ QVariantMap ProjectIO::importObj(const QUrl &url) const
     QVariantList serializedVertices;
     serializedVertices.reserve(vertices.size());
     for (const QVector3D &vertex : vertices) {
-        serializedVertices.append(QVariantList{
+        serializedVertices.append(QVariant::fromValue(QVariantList{
             static_cast<double>(vertex.x()),
             static_cast<double>(vertex.y()),
             static_cast<double>(vertex.z())
-        });
+        }));
     }
 
     QVariantList serializedFaces;
@@ -398,7 +398,7 @@ QVariantMap ProjectIO::importObj(const QUrl &url) const
         corners.reserve(face.size());
         for (const int index : face)
             corners.append(index);
-        serializedFaces.append(corners);
+        serializedFaces.append(QVariant::fromValue(corners));
     }
 
     const QVariantMap mesh{
