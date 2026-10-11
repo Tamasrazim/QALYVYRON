@@ -7,7 +7,7 @@
 #include <QVector3D>
 #include <QtQml/qqmlregistration.h>
 
-class EditableGeometry final : public QQuick3DGeometry
+class EditableGeometry : public QQuick3DGeometry
 {
     Q_OBJECT
     QML_ELEMENT
