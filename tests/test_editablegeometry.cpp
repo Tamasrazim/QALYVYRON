@@ -17,6 +17,8 @@ private slots:
     void edgeIndexTracksTopologyChanges();
     void subdividingEdgeAddsOneMidpointAndPreservesFaces();
     void invalidEdgeSubdivisionIsAtomic();
+    void bevelsCubeEdgeAndKeepsClosedTopology();
+    void invalidEdgeBevelIsAtomic();
     void closedEdgeLoopCreatesFaceForDeletedSurface();
     void invalidEdgeLoopsAreRejectedAtomically();
     void primitiveShapesHaveExpectedTopology();
@@ -121,7 +123,51 @@ void EditableGeometryTests::subdividingEdgeAddsOneMidpointAndPreservesFaces()
     QCOMPARE(geometry.faceCount(), 1);
 }
 
+void EditableGeometryTests::bevelsCubeEdgeAndKeepsClosedTopology()
+{
+    EditableGeometry geometry;
+    QCOMPARE(geometry.vertexCount(), 8);
+    QCOMPARE(geometry.faceCount(), 6);
+    QCOMPARE(geometry.edgeCount(), 12);
+
+    QVERIFY(geometry.bevelEdge(0, 5.0));
+    QCOMPARE(geometry.vertexCount(), 12);
+    QCOMPARE(geometry.faceCount(), 7);
+    QCOMPARE(geometry.edgeCount(), 17);
+
+    for (int face = 0; face < geometry.faceCount(); ++face)
+        QVERIFY2(geometry.faceNormal(face).length() > 0.9f,
+                 "The bevel must keep every face usable for rendering.");
+
+    const QVariantMap saved = geometry.serializeMesh();
+    EditableGeometry restored;
+    QVERIFY(restored.loadMesh(saved));
+    QCOMPARE(restored.vertexCount(), geometry.vertexCount());
+    QCOMPARE(restored.faceCount(), geometry.faceCount());
+    QCOMPARE(restored.edgeCount(), geometry.edgeCount());
+}
+
+void EditableGeometryTests::invalidEdgeBevelIsAtomic()
+{
+    EditableGeometry geometry;
+    const QVariantMap before = geometry.serializeMesh();
+
+    QVERIFY(!geometry.bevelEdge(-1, 5.0));
+    QVERIFY(!geometry.bevelEdge(geometry.edgeCount(), 5.0));
+    QVERIFY(!geometry.bevelEdge(0, 0.0));
+    QVERIFY(!geometry.bevelEdge(0, -2.0));
+    QVERIFY(!geometry.bevelEdge(0, 50.0));
+    QCOMPARE(geometry.serializeMesh(), before);
+
+    // An open plane edge has no closed bevel strip, so it is rejected unchanged.
+    geometry.setShape(QStringLiteral("Plane"));
+    const QVariantMap openBefore = geometry.serializeMesh();
+    QVERIFY(!geometry.bevelEdge(0, 5.0));
+    QCOMPARE(geometry.serializeMesh(), openBefore);
+}
+
 void EditableGeometryTests::invalidEdgeSubdivisionIsAtomic()
+
 {
     EditableGeometry geometry;
     const QVariantMap before = geometry.serializeMesh();

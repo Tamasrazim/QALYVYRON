@@ -37,7 +37,7 @@ Select a cube, sphere, cylinder, cone, or plane, then click **Edit Selected Mesh
 
 The vertex and face indices are shown as zero-based values. The editor also displays the selected face's center and normal. Mesh data is stored in the scene file, restored when the project opens, and included when you duplicate a built-in mesh. Undo and redo checkpoints include the mesh topology.
 
-This mesh workspace supports vertex and face-center selection, ordered vertex multi-selection for face creation, merge vertices, vertex-coordinate editing, face extrusion and inset, and face deletion. Full edge selection, bevel, loop operations, modifiers, and advanced topology tools are still missing.
+This mesh workspace supports vertex and face-center selection, ordered vertex multi-selection for face creation, merge vertices, vertex-coordinate editing, face extrusion and inset, face deletion, edge subdivision and a constrained **Bevel Edge** operation. The first bevel version works on closed mesh edges whose endpoints each connect to three edges; try a smaller width if the tool rejects an edge.
 
 ## Import a 3D asset
 

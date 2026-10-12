@@ -915,6 +915,34 @@ ApplicationWindow {
         refreshMeshEditFields()
         setStatus("Created a face from the selected edge loop.")
     }
+    function bevelSelectedEdge() {
+        const geometry = selectedEditableGeometry()
+        const distance = Number(bevelDistanceField.text)
+        if (!geometry || edgeIndexSpinner.value < 0 || edgeIndexSpinner.value >= geometry.edgeCount) {
+            setStatus("Select a valid mesh edge first.")
+            return
+        }
+        if (!Number.isFinite(distance) || distance <= 0) {
+            setStatus("Enter a bevel width greater than zero.")
+            return
+        }
+
+        const selectedEdge = edgeIndexSpinner.value
+        pushUndoSnapshot()
+        if (!geometry.bevelEdge(selectedEdge, distance)) {
+            setStatus("This edge cannot be safely beveled at that width. Try a smaller width on a closed mesh corner.")
+            return
+        }
+
+        clearMeshEdgeSelection()
+        edgeSelectionMode = false
+        clearMeshVertexSelection()
+        vertexSelectionMode = false
+        edgeIndexSpinner.value = Math.max(0, geometry.edgeCount - 1)
+        refreshMeshEditFields()
+        setStatus("Beveled edge " + selectedEdge + " by " + distance + " scene units.")
+    }
+
     function subdivideSelectedEdge() {
         const geometry = selectedEditableGeometry()
         if (!geometry || edgeIndexSpinner.value < 0 || edgeIndexSpinner.value >= geometry.edgeCount) {
@@ -1870,6 +1898,28 @@ ApplicationWindow {
                     onClicked: root.subdivideSelectedEdge()
                 }
 
+                RowLayout {
+                    Layout.fillWidth: true
+                    Text { text: "Width"; color: root.secondaryText; font.pixelSize: 11 }
+                    TextField {
+                        id: bevelDistanceField
+                        Layout.preferredWidth: 90
+                        text: "5"
+                        selectByMouse: true
+                        validator: DoubleValidator { bottom: 0.01; top: 1000 }
+                    }
+                    Button {
+                        Layout.fillWidth: true
+                        text: "Bevel Edge"
+                        enabled: root.selectedObject !== null
+                                 && !root.selectedObject.editorImported
+                                 && root.selectedEditableGeometry() !== null
+                                 && edgeIndexSpinner.value >= 0
+                                 && edgeIndexSpinner.value < root.selectedEditableGeometry().edgeCount
+                        onClicked: root.bevelSelectedEdge()
+                    }
+                }
+
                 GridLayout {
                     Layout.fillWidth: true
                     columns: 2
@@ -2024,7 +2074,7 @@ ApplicationWindow {
 
                 Text {
                     Layout.fillWidth: true
-                    text: "Enable Select Face Vertices, then click vertex markers in boundary order and choose Create Face. Other tools edit coordinates, merge vertices, extrude/inset faces, and delete faces. Bevel, edge selection, loops and advanced topology still need implementation."
+                    text: "Enable Select Face Vertices, then click vertex markers in boundary order and choose Create Face. Subdivision, constrained edge beveling, vertex merging, face creation, extrusion, inset and deletion edit the mesh directly. The first bevel version supports closed manifold edges with three connected edges at both endpoints."
                     color: "#777777"
                     font.pixelSize: 10
                     wrapMode: Text.WordWrap

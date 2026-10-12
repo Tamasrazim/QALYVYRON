@@ -783,6 +783,280 @@ bool EditableGeometry::createFaceFromEdges(const QVariantList &edgeIndices)
     return createFace(orderedIndices);
 }
 
+bool EditableGeometry::bevelEdge(int edgeIndex, double distance)
+{
+    if (edgeIndex < 0 || edgeIndex >= m_edges.size()
+        || m_vertices.size() + 4 > kMaximumVertices
+        || m_faces.size() + 1 > kMaximumFaces
+        || !std::isfinite(distance) || distance <= kEpsilon) {
+        return false;
+    }
+
+    const QPair<int, int> edge = m_edges.at(edgeIndex);
+    const int first = edge.first;
+    const int second = edge.second;
+    if (first < 0 || second < 0 || first >= m_vertices.size()
+        || second >= m_vertices.size() || first == second) {
+        return false;
+    }
+
+    const auto edgeKey = [](int a, int b) {
+        const int low = std::min(a, b);
+        const int high = std::max(a, b);
+        return (static_cast<quint64>(static_cast<quint32>(low)) << 32)
+            | static_cast<quint32>(high);
+    };
+
+    // Keep this first bevel tool predictable: both ends must be ordinary,
+    // closed three-edge corners, like the corners of a cube.
+    QHash<int, QSet<int>> vertexNeighbors;
+    for (const QPair<int, int> &indexedEdge : m_edges) {
+        vertexNeighbors[indexedEdge.first].insert(indexedEdge.second);
+        vertexNeighbors[indexedEdge.second].insert(indexedEdge.first);
+    }
+    if (vertexNeighbors.value(first).size() != 3
+        || vertexNeighbors.value(second).size() != 3) {
+        return false;
+    }
+
+    struct IncidentFace
+    {
+        int faceIndex = -1;
+        int firstNeighbor = -1;
+        int secondNeighbor = -1;
+        bool firstToSecond = false;
+        int firstPoint = -1;
+        int secondPoint = -1;
+    };
+
+    QVector<IncidentFace> incidentFaces;
+    int firstFaceCount = 0;
+    int secondFaceCount = 0;
+    for (int faceIndex = 0; faceIndex < m_faces.size(); ++faceIndex) {
+        const QVector<int> &face = m_faces.at(faceIndex);
+        if (face.count(first) > 1 || face.count(second) > 1)
+            return false;
+        if (face.contains(first))
+            ++firstFaceCount;
+        if (face.contains(second))
+            ++secondFaceCount;
+        if (face.size() < 3)
+            return false;
+
+        for (int i = 0; i < face.size(); ++i) {
+            const int current = face.at(i);
+            const int next = face.at((i + 1) % face.size());
+            if (!((current == first && next == second)
+                  || (current == second && next == first))) {
+                continue;
+            }
+
+            IncidentFace info;
+            info.faceIndex = faceIndex;
+            info.firstToSecond = current == first;
+            if (info.firstToSecond) {
+                info.firstNeighbor = face.at((i + face.size() - 1) % face.size());
+                info.secondNeighbor = face.at((i + 2) % face.size());
+            } else {
+                info.secondNeighbor = face.at((i + face.size() - 1) % face.size());
+                info.firstNeighbor = face.at((i + 2) % face.size());
+            }
+            incidentFaces.append(info);
+        }
+    }
+
+    // Open edges or inconsistent face winding cannot produce a closed bevel.
+    if (incidentFaces.size() != 2 || firstFaceCount != 3 || secondFaceCount != 3
+        || incidentFaces.at(0).faceIndex == incidentFaces.at(1).faceIndex
+        || incidentFaces.at(0).firstToSecond == incidentFaces.at(1).firstToSecond
+        || incidentFaces.at(0).firstNeighbor == incidentFaces.at(1).firstNeighbor
+        || incidentFaces.at(0).secondNeighbor == incidentFaces.at(1).secondNeighbor) {
+        return false;
+    }
+
+    QHash<quint64, int> bevelPointByEdge;
+    QVector<QVector3D> candidateVertices = m_vertices;
+
+    auto createBevelPoint = [&](int endpoint, int neighbor) -> int {
+        const quint64 key = edgeKey(endpoint, neighbor);
+        const auto existing = bevelPointByEdge.constFind(key);
+        if (existing != bevelPointByEdge.cend())
+            return existing.value();
+        if (neighbor < 0 || neighbor >= m_vertices.size() || neighbor == endpoint)
+            return -1;
+
+        const QVector3D start = m_vertices.at(endpoint);
+        const QVector3D end = m_vertices.at(neighbor);
+        const QVector3D direction = end - start;
+        const float edgeLength = direction.length();
+        // Leave enough room beyond the bevel so adjacent edges do not collapse.
+        if (!std::isfinite(edgeLength) || edgeLength <= 2.0 * distance)
+            return -1;
+
+        const QVector3D point = start + direction * static_cast<float>(distance / edgeLength);
+        if (!finiteVector(point) || std::abs(point.x()) > 1.0e6f
+            || std::abs(point.y()) > 1.0e6f || std::abs(point.z()) > 1.0e6f) {
+            return -1;
+        }
+
+        const int index = candidateVertices.size();
+        candidateVertices.append(point);
+        bevelPointByEdge.insert(key, index);
+        return index;
+    };
+
+    for (IncidentFace &info : incidentFaces) {
+        info.firstPoint = createBevelPoint(first, info.firstNeighbor);
+        info.secondPoint = createBevelPoint(second, info.secondNeighbor);
+        if (info.firstPoint < 0 || info.secondPoint < 0)
+            return false;
+    }
+    if (candidateVertices.size() != m_vertices.size() + 4)
+        return false;
+
+    QVector<QVector<int>> candidateFaces;
+    candidateFaces.reserve(m_faces.size() + 1);
+    for (int faceIndex = 0; faceIndex < m_faces.size(); ++faceIndex) {
+        const QVector<int> &face = m_faces.at(faceIndex);
+        QVector<int> candidate;
+        candidate.reserve(face.size() + 2);
+
+        const IncidentFace *incident = nullptr;
+        for (const IncidentFace &info : incidentFaces) {
+            if (info.faceIndex == faceIndex) {
+                incident = &info;
+                break;
+            }
+        }
+
+        if (incident) {
+            // The two faces beside the chosen edge keep one new edge segment each.
+            for (const int vertex : face) {
+                if (vertex == first)
+                    candidate.append(incident->firstPoint);
+                else if (vertex == second)
+                    candidate.append(incident->secondPoint);
+                else
+                    candidate.append(vertex);
+            }
+        } else {
+            // Faces at either endpoint get two points in boundary order, trimming
+            // the old corner while keeping the shared edges connected.
+            for (int i = 0; i < face.size(); ++i) {
+                const int vertex = face.at(i);
+                if (vertex != first && vertex != second) {
+                    candidate.append(vertex);
+                    continue;
+                }
+
+                const int previous = face.at((i + face.size() - 1) % face.size());
+                const int next = face.at((i + 1) % face.size());
+                const auto previousPoint = bevelPointByEdge.constFind(edgeKey(vertex, previous));
+                const auto nextPoint = bevelPointByEdge.constFind(edgeKey(vertex, next));
+                if (previousPoint == bevelPointByEdge.cend()
+                    || nextPoint == bevelPointByEdge.cend()) {
+                    return false;
+                }
+                candidate.append(previousPoint.value());
+                candidate.append(nextPoint.value());
+            }
+        }
+
+        if (candidate.size() < 3 || candidate.size() > kMaximumFaceCorners
+            || !validFace(candidate, candidateVertices.size())) {
+            return false;
+        }
+        candidateFaces.append(candidate);
+    }
+
+    // Build the new flat face with winding opposite to the two faces being cut.
+    const IncidentFace &firstIncident = incidentFaces.first();
+    const IncidentFace &secondIncident = incidentFaces.last();
+    QVector<int> bevelFace;
+    if (firstIncident.firstToSecond) {
+        bevelFace = {firstIncident.secondPoint, firstIncident.firstPoint,
+                     secondIncident.firstPoint, secondIncident.secondPoint};
+    } else {
+        bevelFace = {firstIncident.firstPoint, firstIncident.secondPoint,
+                     secondIncident.secondPoint, secondIncident.firstPoint};
+    }
+    if (!validFace(bevelFace, candidateVertices.size()))
+        return false;
+
+    QVector3D bevelNormal;
+    for (int i = 0; i < bevelFace.size(); ++i) {
+        const QVector3D &a = candidateVertices.at(bevelFace.at(i));
+        const QVector3D &b = candidateVertices.at(bevelFace.at((i + 1) % bevelFace.size()));
+        bevelNormal.setX(bevelNormal.x() + (a.y() - b.y()) * (a.z() + b.z()));
+        bevelNormal.setY(bevelNormal.y() + (a.z() - b.z()) * (a.x() + b.x()));
+        bevelNormal.setZ(bevelNormal.z() + (a.x() - b.x()) * (a.y() + b.y()));
+    }
+    if (!finiteVector(bevelNormal) || bevelNormal.lengthSquared() < kEpsilon * kEpsilon)
+        return false;
+
+    const QVector3D normalizedNormal = bevelNormal.normalized();
+    const QVector3D origin = candidateVertices.at(bevelFace.first());
+    float extent = 1.0f;
+    for (const int index : bevelFace)
+        extent = std::max(extent, (candidateVertices.at(index) - origin).length());
+    const float planeTolerance = std::max(1.0e-3f, extent * 1.0e-3f);
+    for (const int index : bevelFace) {
+        if (std::abs(QVector3D::dotProduct(candidateVertices.at(index) - origin,
+                                           normalizedNormal)) > planeTolerance) {
+            return false;
+        }
+    }
+
+    // The renderer fans each polygon into triangles, so do not accept a folded quad.
+    for (int i = 0; i < bevelFace.size(); ++i) {
+        const QVector3D &a = candidateVertices.at(bevelFace.at(i));
+        const QVector3D &b = candidateVertices.at(bevelFace.at((i + 1) % bevelFace.size()));
+        const QVector3D &c = candidateVertices.at(bevelFace.at((i + 2) % bevelFace.size()));
+        const float turn = QVector3D::dotProduct(
+            QVector3D::crossProduct(b - a, c - b), normalizedNormal);
+        if (!std::isfinite(turn) || turn <= kEpsilon)
+            return false;
+    }
+    candidateFaces.append(bevelFace);
+
+    qint64 renderedVertices = 0;
+    QHash<quint64, int> edgeUseCounts;
+    for (const QVector<int> &face : candidateFaces) {
+        QVector3D normal;
+        for (int i = 0; i < face.size(); ++i) {
+            const QVector3D &a = candidateVertices.at(face.at(i));
+            const QVector3D &b = candidateVertices.at(face.at((i + 1) % face.size()));
+            normal.setX(normal.x() + (a.y() - b.y()) * (a.z() + b.z()));
+            normal.setY(normal.y() + (a.z() - b.z()) * (a.x() + b.x()));
+            normal.setZ(normal.z() + (a.x() - b.x()) * (a.y() + b.y()));
+
+            const quint64 key = edgeKey(face.at(i), face.at((i + 1) % face.size()));
+            const int uses = edgeUseCounts.value(key) + 1;
+            if (uses > 2)
+                return false;
+            edgeUseCounts.insert(key, uses);
+        }
+        if (!finiteVector(normal) || normal.lengthSquared() < kEpsilon * kEpsilon)
+            return false;
+
+        renderedVertices += static_cast<qint64>(face.size() - 2) * 3;
+        if (renderedVertices > kMaximumRenderedVertices)
+            return false;
+    }
+
+    // A closed bevel keeps every edge shared by exactly two faces.
+    for (auto it = edgeUseCounts.cbegin(); it != edgeUseCounts.cend(); ++it) {
+        if (it.value() != 2)
+            return false;
+    }
+
+    m_vertices = candidateVertices;
+    m_faces = candidateFaces;
+    rebuildGeometry();
+    emit meshChanged();
+    return true;
+}
+
 bool EditableGeometry::subdivideEdge(int edgeIndex)
 {
     if (edgeIndex < 0 || edgeIndex >= m_edges.size()

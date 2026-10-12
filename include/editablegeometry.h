@@ -42,6 +42,8 @@ public:
     Q_INVOKABLE bool createFace(const QVariantList &vertexIndices);
     Q_INVOKABLE bool createFaceFromEdges(const QVariantList &edgeIndices);
     Q_INVOKABLE bool subdivideEdge(int edgeIndex);
+    // Cut a small chamfer across one closed-manifold edge.
+    Q_INVOKABLE bool bevelEdge(int edgeIndex, double distance);
     Q_INVOKABLE QVariantMap serializeMesh() const;
     Q_INVOKABLE bool loadMesh(const QVariantMap &data);
 
