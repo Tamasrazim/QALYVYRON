@@ -96,6 +96,28 @@ ApplicationWindow {
     }
 
     Shortcut {
+        sequence: StandardKey.SaveAs
+        enabled: !unsavedChangesDialog.visible
+                 && !renderProgressDialog.visible
+                 && !meshEditDialog.visible
+                 && !introDialog.visible
+        onActivated: saveSceneDialog.open()
+    }
+
+    Shortcut {
+        // F2 is the common rename key; it starts editing the selected object's name.
+        sequence: "F2"
+        enabled: root.selectedObject !== null && root.selectedIndex >= 0
+                 && !unsavedChangesDialog.visible
+                 && !renderProgressDialog.visible
+                 && !meshEditDialog.visible
+        onActivated: {
+            objectNameField.forceActiveFocus()
+            objectNameField.selectAll()
+        }
+    }
+
+    Shortcut {
         sequence: StandardKey.Open
         onActivated: openSceneDialog.open()
     }
