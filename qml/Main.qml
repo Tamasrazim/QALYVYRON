@@ -3046,10 +3046,15 @@ ApplicationWindow {
                                     ))
                                     const start = initialObjectPosition
                                     const pointerStart = initialPointerPosition
+                                    // The center gizmo is another way to move an object,
+                                    // so it uses the same snapping rule as a direct viewport drag.
+                                    const movedX = start.x + pointer.x - pointerStart.x
+                                    const movedY = start.y + pointer.y - pointerStart.y
+                                    const movedZ = start.z + pointer.z - pointerStart.z
                                     dragObject.position = Qt.vector3d(
-                                        start.x + pointer.x - pointerStart.x,
-                                        start.y + pointer.y - pointerStart.y,
-                                        start.z + pointer.z - pointerStart.z
+                                        root.snapMovementValue(movedX),
+                                        root.snapMovementValue(movedY),
+                                        root.snapMovementValue(movedZ)
                                     )
                                     if (root.selectedIndex >= 0) {
                                         objectList.setProperty(root.selectedIndex, "x", dragObject.position.x)
