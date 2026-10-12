@@ -17,7 +17,7 @@ A new scene starts with one cube so there is only one thing to focus on. Use **A
 - **Left click:** select an object.
 - **Left drag on a shape:** move it in the scene.
 - **Front / Top / Side:** choose an aligned orthographic view for accurate proportions without perspective distortion.
-- **Perspective / Orthographic:** switch projection modes directly; the mode is saved with the scene and used by the final PNG render too.
+- **Perspective / Orthographic:** switch projection modes directly; the mode is saved with the scene and used by the final PNG render too. In **Show all tools** mode, use the **Background** colour picker to set the solid viewport background; this colour is saved with the scene and also fills the background of the final PNG render.
 - **Focus Selected:** center the camera on the selected object.
 - **Frame All:** calculate a view that includes the current scene; it works for distant objects and supported custom meshes too.
 - **Snap: Off / Snap: On:** turn grid snapping on or off for object dragging. Choose a step of 1, 5, 10, 25, or 50 scene units from the dropdown beside it. Snapping is off by default. It affects mouse-drag placement only; the numeric position fields remain exact.

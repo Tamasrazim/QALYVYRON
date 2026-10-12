@@ -46,6 +46,8 @@ ApplicationWindow {
     property real orbitDistance: 470
     // Parallel projection is useful for proportion checks and axis-aligned modeling views.
     property bool orthographicMode: false
+    // One solid background colour is used by the viewport and the offline still renderer.
+    property color backgroundColor: "#171717"
     // The fill light uses one saved position for the viewport and final renderer.
     property vector3d fillLightPosition: Qt.vector3d(-160, 190, 140)
     // Keep the fill-light colour in one place so viewport and final-render colours agree.
@@ -482,6 +484,28 @@ ApplicationWindow {
         keyLightRotation = Qt.vector3d(x, y, z)
         refreshKeyLightRotationFields()
         setStatus("Updated directional key-light rotation.")
+    }
+
+    function openBackgroundColorPicker() {
+        backgroundColorDialog.selectedColor = backgroundColor
+        backgroundColorDialog.open()
+    }
+
+    function setBackgroundColor(pickedColor) {
+        // Store a simple RGB hex value so the choice survives a project save and reopen.
+        function toHexByte(component) {
+            const byteValue = Math.max(0, Math.min(255, Math.round(component * 255)))
+            return byteValue.toString(16).padStart(2, "0")
+        }
+        const hexColor = "#" + toHexByte(pickedColor.r)
+                               + toHexByte(pickedColor.g)
+                               + toHexByte(pickedColor.b)
+        if (String(backgroundColor).toLowerCase() === hexColor)
+            return
+
+        pushUndoSnapshot()
+        backgroundColor = hexColor
+        setStatus("Updated scene background colour to " + hexColor + ".")
     }
 
     function updateCamera() {
@@ -1686,6 +1710,7 @@ ApplicationWindow {
         focusTarget.position = Qt.vector3d(0, 0, 0)
         camera.fieldOfView = 45
         orthographicMode = false
+        backgroundColor = "#171717"
         keyLightRotation = Qt.vector3d(-42, -35, 0)
         keyLight.brightness = 1.7
         fillLight.brightness = 65
@@ -1740,6 +1765,7 @@ ApplicationWindow {
             title: "QALYVYRON Scene",
             settings: {
                 cameraFov: camera.fieldOfView,
+                backgroundColor: String(root.backgroundColor),
                 keyLightBrightness: keyLight.brightness,
                 keyLightRotationX: root.keyLightRotation.x,
                 keyLightRotationY: root.keyLightRotation.y,
@@ -1769,6 +1795,7 @@ ApplicationWindow {
 
         // Start with known defaults so older scene files remain predictable.
         camera.fieldOfView = 45
+        backgroundColor = "#171717"
         keyLightRotation = Qt.vector3d(-42, -35, 0)
         keyLight.brightness = 1.7
         fillLight.brightness = 65
@@ -1805,6 +1832,12 @@ ApplicationWindow {
         if (/^#[0-9a-f]{6}$/i.test(savedFillColor))
             fillLightColor = savedFillColor
         refreshFillTintSelection()
+
+        // Old scenes have no background setting, so keep the original dark workspace colour.
+        const savedBackgroundColor = settings.backgroundColor === undefined
+            ? "" : String(settings.backgroundColor)
+        if (/^#[0-9a-f]{6}$/i.test(savedBackgroundColor))
+            backgroundColor = savedBackgroundColor
 
         // Older scenes don't store the light position, so keep the old default for them.
         const fillX = settings.fillLightX !== undefined && Number.isFinite(Number(settings.fillLightX))
@@ -2728,6 +2761,12 @@ ApplicationWindow {
         onRejected: root.refreshFillTintSelection()
     }
 
+    ColorDialog {
+        id: backgroundColorDialog
+        title: "Choose a scene background colour"
+        onAccepted: root.setBackgroundColor(selectedColor)
+    }
+
     FileDialog {
         id: exportImageDialog
         title: "Export Viewport Preview"
@@ -3368,7 +3407,7 @@ ApplicationWindow {
                             camera: root.orthographicMode ? orthographicCamera : camera
                             environment: SceneEnvironment {
                                 backgroundMode: SceneEnvironment.Color
-                                clearColor: "#171717"
+                                clearColor: root.backgroundColor
                                 antialiasingMode: SceneEnvironment.MSAA
                                 antialiasingQuality: SceneEnvironment.High
                             }
@@ -4666,6 +4705,29 @@ ApplicationWindow {
                         value: camera.fieldOfView
                         onPressedChanged: if (pressed) root.pushUndoSnapshot()
                         onMoved: camera.fieldOfView = value
+                    }
+
+                    RowLayout {
+                        visible: !root.beginnerMode
+                        Layout.fillWidth: true
+                        Text { text: "Background"; color: root.secondaryText; font.pixelSize: 10 }
+                        Item { Layout.fillWidth: true }
+                        Rectangle {
+                            width: 24
+                            height: 20
+                            radius: 2
+                            color: root.backgroundColor
+                            border.color: root.borderColor
+                        }
+                        Text {
+                            text: String(root.backgroundColor)
+                            color: "#cecece"
+                            font.pixelSize: 10
+                        }
+                        Button {
+                            text: "Choose…"
+                            onClicked: root.openBackgroundColorPicker()
+                        }
                     }
 
                     Item { Layout.fillHeight: true }

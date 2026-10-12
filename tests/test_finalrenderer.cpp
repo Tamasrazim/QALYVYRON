@@ -75,6 +75,7 @@ private slots:
     void keyLightRotationChangesFinalRenderAppearance();
     void fillLightPositionChangesFinalRenderAppearance();
     void fillLightColorChangesFinalRenderAppearance();
+    void backgroundColorChangesFinalRenderAppearance();
     void orthographicProjectionChangesFinalRender();
     void writesPngFromSceneGeometry();
 };
@@ -426,7 +427,59 @@ void FinalRendererTests::fillLightPositionChangesFinalRenderAppearance()
     QVERIFY(!renderer.busy());
 }
 
+void FinalRendererTests::backgroundColorChangesFinalRenderAppearance()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    auto sceneWithBackground = [](const QString &color) {
+        QVariantMap scene = smallPlaneScene();
+        QVariantMap settings = scene.value(QStringLiteral("settings")).toMap();
+        settings.insert(QStringLiteral("backgroundColor"), color);
+        scene.insert(QStringLiteral("settings"), settings);
+        return scene;
+    };
+
+    FinalRenderer renderer;
+    QSignalSpy finished(&renderer, &FinalRenderer::renderFinished);
+    QVERIFY(finished.isValid());
+
+    const QString darkPath = directory.filePath(QStringLiteral("background-dark.png"));
+    QVERIFY(renderer.startRender(QUrl::fromLocalFile(darkPath),
+                                 sceneWithBackground(QStringLiteral("#171717")), 64, 64, 1, 0));
+    QTRY_VERIFY_WITH_TIMEOUT(!finished.isEmpty(), 10000);
+    const QList<QVariant> darkResult = finished.takeFirst();
+    QVERIFY2(darkResult.at(0).toBool(), qPrintable(darkResult.at(1).toString()));
+    const QImage darkImage(darkPath);
+    QVERIFY(!darkImage.isNull());
+
+    const QString purplePath = directory.filePath(QStringLiteral("background-purple.png"));
+    QVERIFY(renderer.startRender(QUrl::fromLocalFile(purplePath),
+                                 sceneWithBackground(QStringLiteral("#7842a8")), 64, 64, 1, 0));
+    QTRY_VERIFY_WITH_TIMEOUT(!finished.isEmpty(), 10000);
+    const QList<QVariant> purpleResult = finished.takeFirst();
+    QVERIFY2(purpleResult.at(0).toBool(), qPrintable(purpleResult.at(1).toString()));
+    const QImage purpleImage(purplePath);
+    QVERIFY(!purpleImage.isNull());
+
+    qint64 totalPixelDifference = 0;
+    for (int y = 0; y < darkImage.height(); ++y) {
+        const auto *darkRow = reinterpret_cast<const QRgb *>(darkImage.constScanLine(y));
+        const auto *purpleRow = reinterpret_cast<const QRgb *>(purpleImage.constScanLine(y));
+        for (int x = 0; x < darkImage.width(); ++x) {
+            totalPixelDifference += std::abs(qRed(darkRow[x]) - qRed(purpleRow[x]));
+            totalPixelDifference += std::abs(qGreen(darkRow[x]) - qGreen(purpleRow[x]));
+            totalPixelDifference += std::abs(qBlue(darkRow[x]) - qBlue(purpleRow[x]));
+        }
+    }
+
+    QVERIFY2(totalPixelDifference > 100,
+             "The chosen scene background colour must appear in final-render pixels.");
+    QVERIFY(!renderer.busy());
+}
+
 void FinalRendererTests::orthographicProjectionChangesFinalRender()
+
 
 {
     QTemporaryDir directory;

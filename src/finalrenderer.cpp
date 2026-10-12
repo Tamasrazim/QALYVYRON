@@ -979,7 +979,12 @@ void FinalRenderer::runRender(QString outputPath,
         const QColor savedFillColor(settings.value(QStringLiteral("fillLightColor")).toString());
         const QVector3D fillTint = savedFillColor.isValid()
             ? colorToLinear(savedFillColor) : presetFillTint;
-        const QVector3D background = colorToLinear(QColor(QStringLiteral("#171717")));
+        const QString savedBackgroundText =
+            settings.value(QStringLiteral("backgroundColor")).toString();
+        QColor savedBackgroundColor(savedBackgroundText);
+        if (!savedBackgroundColor.isValid())
+            savedBackgroundColor = QColor(QStringLiteral("#171717"));
+        const QVector3D background = colorToLinear(savedBackgroundColor);
 
         QImage image(width, height, QImage::Format_ARGB32);
         if (image.isNull()) {
