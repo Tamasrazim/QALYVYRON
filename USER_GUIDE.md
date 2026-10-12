@@ -58,7 +58,7 @@ The current OBJ importer is geometry-only. It does not yet preserve texture coor
 
 ## Materials, lights, and camera
 
-For built-in editable mesh objects, the inspector offers six quick color swatches plus **Choose custom color…**, as well as roughness and metallic controls. Custom colors are saved in the scene and appear in both the live viewport and the offline render. The metallic value affects both the live PrincipledMaterial preview and the offline renderer. This is a basic metallic response; full PBR nodes, alpha, normal maps, and texture inputs are not implemented yet. The key/fill lights and camera field of view can be adjusted through sliders. Imported-asset material controls are disabled where the current code cannot apply the edit reliably.
+For built-in editable mesh objects, the inspector offers six quick color swatches plus **Choose custom color…**, as well as roughness and metallic controls. In **Show all tools** mode, **Plastic**, **Metal**, **Rubber**, and **Gold** presets update base color, roughness, and metalness together. Each preset appears in both the live viewport and offline render, and the change can be undone. The metallic value affects both the live PrincipledMaterial preview and the offline renderer. This is a basic metallic response; full PBR nodes, alpha, normal maps, and texture inputs are not implemented yet. The key/fill lights and camera field of view can be adjusted through sliders. Imported-asset material controls are disabled where the current code cannot apply the edit reliably.
 
 ## Undo and redo
 

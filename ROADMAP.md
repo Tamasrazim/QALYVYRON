@@ -64,6 +64,7 @@ This stage is what separates a scene viewer from a practical 3D creation tool.
 - [x] Aim the offline-render camera at the saved viewport focus target, including off-origin scenes, with regression coverage.
 - [x] Test that per-object metalness changes final-render output.
 - [x] Add a custom base-color picker that saves the chosen color into scene data and feeds both the live viewport and offline renderer.
+- [x] Add one-click Plastic, Metal, Rubber, and Gold material presets that update viewport and offline-render values together.
 - [ ] Add a full PBR material editor with alpha, normal, texture inputs, and node-based material construction. A basic per-object metallic value is now available.
 - [ ] Add UV coordinates and a practical UV editing workflow.
 - [ ] Add environment and area lights, soft shadows, and a denoiser.

@@ -1344,6 +1344,32 @@ ApplicationWindow {
         objectList.setProperty(selectedIndex, "metalness", metalness)
     }
 
+    function applyMaterialPreset(presetName) {
+        if (!selectedObject || selectedIndex < 0 || selectedObject.editorImported)
+            return
+
+        const presets = {
+            plastic: {label: "Plastic", color: "#508bdc", roughness: 0.28, metalness: 0.0},
+            metal: {label: "Metal", color: "#c8c8c8", roughness: 0.22, metalness: 1.0},
+            rubber: {label: "Rubber", color: "#555555", roughness: 0.90, metalness: 0.0},
+            gold: {label: "Gold", color: "#d8ae57", roughness: 0.24, metalness: 0.92}
+        }
+        const preset = presets[String(presetName).toLowerCase()]
+        if (!preset)
+            return
+
+        // Change all material values together so the result is immediately useful.
+        pushUndoSnapshot()
+        selectedObject.editorColor = preset.color
+        selectedObject.editorRoughness = preset.roughness
+        selectedObject.editorMetalness = preset.metalness
+        objectList.setProperty(selectedIndex, "color", preset.color)
+        objectList.setProperty(selectedIndex, "roughness", preset.roughness)
+        objectList.setProperty(selectedIndex, "metalness", preset.metalness)
+        refreshInspector()
+        setStatus("Applied " + preset.label + " material to " + selectedObject.editorLabel + ".")
+    }
+
     function duplicateSelected() {
         if (!selectedObject || selectedIndex < 0)
             return
@@ -3972,6 +3998,48 @@ ApplicationWindow {
                         enabled: root.selectedObject !== null && !root.selectedObject.editorImported
                         model: ["Silver", "White", "Graphite", "Red", "Blue", "Gold"]
                         onActivated: root.setMaterialColorByIndex(currentIndex)
+                    }
+
+                    Text {
+                        visible: !root.beginnerMode
+                        text: "QUICK MATERIAL PRESETS"
+                        color: "#bcbcbc"
+                        font.pixelSize: 10
+                        font.bold: true
+                        font.letterSpacing: 1.1
+                    }
+
+                    GridLayout {
+                        visible: !root.beginnerMode
+                        Layout.fillWidth: true
+                        columns: 2
+                        columnSpacing: 6
+                        rowSpacing: 6
+
+                        Button {
+                            Layout.fillWidth: true
+                            text: "Plastic"
+                            enabled: root.selectedObject !== null && !root.selectedObject.editorImported
+                            onClicked: root.applyMaterialPreset("plastic")
+                        }
+                        Button {
+                            Layout.fillWidth: true
+                            text: "Metal"
+                            enabled: root.selectedObject !== null && !root.selectedObject.editorImported
+                            onClicked: root.applyMaterialPreset("metal")
+                        }
+                        Button {
+                            Layout.fillWidth: true
+                            text: "Rubber"
+                            enabled: root.selectedObject !== null && !root.selectedObject.editorImported
+                            onClicked: root.applyMaterialPreset("rubber")
+                        }
+                        Button {
+                            Layout.fillWidth: true
+                            text: "Gold"
+                            enabled: root.selectedObject !== null && !root.selectedObject.editorImported
+                            onClicked: root.applyMaterialPreset("gold")
+                        }
                     }
 
                     Text {
