@@ -920,6 +920,7 @@ void FinalRenderer::runRender(QString outputPath,
             numberOr(settings, QStringLiteral("orbitDistance"), 470.0), 20.0, 1.0e6));
         const float fov = static_cast<float>(std::clamp(
             numberOr(settings, QStringLiteral("cameraFov"), 45.0), 10.0, 120.0));
+        const bool orthographicMode = settings.value(QStringLiteral("orthographicMode")).toBool();
 
         // Focus/fame actions save a world-space target in the scene settings.
         // Keep the offline camera aimed at that target, not hard-coded at world origin.
@@ -980,14 +981,24 @@ void FinalRenderer::runRender(QString outputPath,
             for (int x = 0; x < width; ++x) {
                 QVector3D accumulated;
                 for (int sample = 0; sample < samplesPerPixel; ++sample) {
-                    const float sampleX = static_cast<float>(x) + jitter(random);
-                    const float sampleY = static_cast<float>(y) + jitter(random);
-                    const float imageX = (2.0f * sampleX / width - 1.0f)
-                        * imageAspect * halfFovScale;
-                    const float imageY = (1.0f - 2.0f * sampleY / height) * halfFovScale;
-                    const QVector3D direction =
-                        (forward + right * imageX + up * imageY).normalized();
-                    const Ray ray{cameraPosition, direction};
+                    const float normalizedX = 2.0f * sampleX / width - 1.0f;
+                    const float normalizedY = 1.0f - 2.0f * sampleY / height;
+                    QVector3D rayOrigin = cameraPosition;
+                    QVector3D direction;
+                    if (orthographicMode) {
+                        // Match the viewport's orthographic camera: all rays are parallel,
+                        // and their origins are spread across the camera's image plane.
+                        const float halfHeight = distance * halfFovScale;
+                        const float halfWidth = halfHeight * imageAspect;
+                        rayOrigin += right * (normalizedX * halfWidth)
+                            + up * (normalizedY * halfHeight);
+                        direction = forward;
+                    } else {
+                        const float imageX = normalizedX * imageAspect * halfFovScale;
+                        const float imageY = normalizedY * halfFovScale;
+                        direction = (forward + right * imageX + up * imageY).normalized();
+                    }
+                    const Ray ray{rayOrigin, direction};
                     accumulated += tracePath(ray, accelerator, directionalLight,
                                              keyBrightness, pointLightPosition,
                                              fillBrightness, fillTint, background,

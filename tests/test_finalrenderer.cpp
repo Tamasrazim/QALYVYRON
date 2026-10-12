@@ -72,6 +72,7 @@ private slots:
     void offlineRenderRespectsViewportFocusTarget();
     void metalnessChangesFinalRenderAppearance();
     void smoothShadingChangesFinalRenderAppearance();
+    void orthographicProjectionChangesFinalRender();
     void writesPngFromSceneGeometry();
 };
 
@@ -259,7 +260,64 @@ void FinalRendererTests::metalnessChangesFinalRenderAppearance()
     QVERIFY(!renderer.busy());
 }
 
+void FinalRendererTests::orthographicProjectionChangesFinalRender()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    QVariantMap perspectiveScene = smallPlaneScene();
+    QVariantMap settings = perspectiveScene.value(QStringLiteral("settings")).toMap();
+    settings.insert(QStringLiteral("orthographicMode"), false);
+    perspectiveScene.insert(QStringLiteral("settings"), settings);
+
+    QVariantMap orthographicScene = perspectiveScene;
+    settings.insert(QStringLiteral("orthographicMode"), true);
+    orthographicScene.insert(QStringLiteral("settings"), settings);
+
+    FinalRenderer renderer;
+    QSignalSpy finished(&renderer, &FinalRenderer::renderFinished);
+    QVERIFY(finished.isValid());
+
+    const QString perspectivePath = directory.filePath(QStringLiteral("perspective.png"));
+    QVERIFY(renderer.startRender(QUrl::fromLocalFile(perspectivePath),
+                                 perspectiveScene, 64, 64, 1, 0));
+    QTRY_VERIFY_WITH_TIMEOUT(!finished.isEmpty(), 10000);
+    const QList<QVariant> perspectiveResult = finished.takeFirst();
+    QVERIFY2(perspectiveResult.at(0).toBool(),
+             qPrintable(perspectiveResult.at(1).toString()));
+    const QImage perspectiveImage(perspectivePath);
+    QVERIFY(!perspectiveImage.isNull());
+
+    const QString orthographicPath = directory.filePath(QStringLiteral("orthographic.png"));
+    QVERIFY(renderer.startRender(QUrl::fromLocalFile(orthographicPath),
+                                 orthographicScene, 64, 64, 1, 0));
+    QTRY_VERIFY_WITH_TIMEOUT(!finished.isEmpty(), 10000);
+    const QList<QVariant> orthographicResult = finished.takeFirst();
+    QVERIFY2(orthographicResult.at(0).toBool(),
+             qPrintable(orthographicResult.at(1).toString()));
+    const QImage orthographicImage(orthographicPath);
+    QVERIFY(!orthographicImage.isNull());
+
+    qint64 totalPixelDifference = 0;
+    for (int y = 0; y < perspectiveImage.height(); ++y) {
+        const auto *perspectiveRow =
+            reinterpret_cast<const QRgb *>(perspectiveImage.constScanLine(y));
+        const auto *orthographicRow =
+            reinterpret_cast<const QRgb *>(orthographicImage.constScanLine(y));
+        for (int x = 0; x < perspectiveImage.width(); ++x) {
+            totalPixelDifference += std::abs(qRed(perspectiveRow[x]) - qRed(orthographicRow[x]));
+            totalPixelDifference += std::abs(qGreen(perspectiveRow[x]) - qGreen(orthographicRow[x]));
+            totalPixelDifference += std::abs(qBlue(perspectiveRow[x]) - qBlue(orthographicRow[x]));
+        }
+    }
+
+    QVERIFY2(totalPixelDifference > 100,
+             "Orthographic mode must change the rendered projection, not only its saved setting.");
+    QVERIFY(!renderer.busy());
+}
+
 void FinalRendererTests::smoothShadingChangesFinalRenderAppearance()
+
 {
     QTemporaryDir directory;
     QVERIFY(directory.isValid());

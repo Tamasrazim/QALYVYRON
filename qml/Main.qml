@@ -44,6 +44,8 @@ ApplicationWindow {
     property real orbitYaw: 34
     property real orbitPitch: 23
     property real orbitDistance: 470
+    // Parallel projection is useful for proportion checks and axis-aligned modeling views.
+    property bool orthographicMode: false
     property real gizmoX: 0
     property real gizmoY: 0
     property real gizmoDepth: 1
@@ -326,6 +328,14 @@ ApplicationWindow {
         )
         camera.lookAt(focusTarget)
         Qt.callLater(root.updateGizmo)
+    }
+
+    function toggleCameraProjection() {
+        pushUndoSnapshot()
+        orthographicMode = !orthographicMode
+        setStatus(orthographicMode
+                  ? "Orthographic projection: parallel edges stay parallel."
+                  : "Perspective projection: depth changes apparent size.")
     }
 
     function snapMovementValue(value) {
@@ -1507,6 +1517,7 @@ ApplicationWindow {
         orbitDistance = 470
         focusTarget.position = Qt.vector3d(0, 0, 0)
         camera.fieldOfView = 45
+        orthographicMode = false
         keyLight.brightness = 1.7
         fillLight.brightness = 65
         fillLight.color = "#ffffff"
@@ -1564,7 +1575,8 @@ ApplicationWindow {
                 orbitDistance: root.orbitDistance,
                 orbitTargetX: focusTarget.position.x,
                 orbitTargetY: focusTarget.position.y,
-                orbitTargetZ: focusTarget.position.z
+                orbitTargetZ: focusTarget.position.z,
+                orthographicMode: root.orthographicMode
             },
             objects: serializedObjects
         }
@@ -1609,6 +1621,7 @@ ApplicationWindow {
             orbitPitch = Math.max(-80, Math.min(80, Number(settings.orbitPitch)))
         if (settings.orbitDistance !== undefined && Number.isFinite(Number(settings.orbitDistance)))
             orbitDistance = Math.max(120, Math.min(2800, Number(settings.orbitDistance)))
+        orthographicMode = settings.orthographicMode === true
 
         const targetX = settings.orbitTargetX !== undefined && Number.isFinite(Number(settings.orbitTargetX))
                         ? Math.max(-1000000, Math.min(1000000, Number(settings.orbitTargetX))) : 0
@@ -3131,6 +3144,7 @@ ApplicationWindow {
                         View3D {
                             id: view3d
                             anchors.fill: parent
+                            camera: root.orthographicMode ? orthographicCamera : camera
                             environment: SceneEnvironment {
                                 backgroundMode: SceneEnvironment.Color
                                 clearColor: "#171717"
@@ -3162,6 +3176,21 @@ ApplicationWindow {
                                 clipNear: 1
                                 clipFar: 4000
                                 fieldOfView: 45
+                            }
+
+                            OrthographicCamera {
+                                id: orthographicCamera
+                                position: camera.position
+                                eulerRotation: camera.eulerRotation
+                                clipNear: 1
+                                clipFar: 4000
+                                // Match perspective zoom at the current orbit distance.
+                                // These values are the half-width and half-height of the view box.
+                                verticalMagnification: Math.max(
+                                    80, root.orbitDistance
+                                       * Math.tan(camera.fieldOfView * Math.PI / 360))
+                                horizontalMagnification: verticalMagnification
+                                    * Math.max(0.1, view3d.width / Math.max(1, view3d.height))
                             }
 
                             DirectionalLight {
@@ -3680,11 +3709,21 @@ ApplicationWindow {
                                     height: 27
                                     text: modelData.label
                                     onClicked: {
+                                        root.pushUndoSnapshot()
                                         root.orbitYaw = modelData.yaw
                                         root.orbitPitch = modelData.pitch
+                                        root.orthographicMode = true
                                         root.updateCamera()
                                     }
                                 }
+                            }
+                            Button {
+                                width: 118
+                                height: 27
+                                text: root.orthographicMode ? "ORTHOGRAPHIC" : "PERSPECTIVE"
+                                onClicked: root.toggleCameraProjection()
+                                ToolTip.visible: hovered
+                                ToolTip.text: "Switch between parallel projection and perspective depth."
                             }
                         }
 
