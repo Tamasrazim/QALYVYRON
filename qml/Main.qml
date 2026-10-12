@@ -196,6 +196,23 @@ ApplicationWindow {
         return JSON.parse(JSON.stringify(serializeScene()))
     }
 
+    // A rejected mesh operation must not add a fake Undo step or erase the Redo path.
+    function captureHistoryCheckpoint() {
+        return {
+            undoStack: undoStack.slice(),
+            redoStack: redoStack.slice(),
+            projectDirty: projectDirty
+        }
+    }
+
+    function restoreHistoryCheckpoint(checkpoint) {
+        if (!checkpoint)
+            return
+        undoStack = checkpoint.undoStack
+        redoStack = checkpoint.redoStack
+        projectDirty = checkpoint.projectDirty
+    }
+
     function pushUndoSnapshot() {
         if (historyLocked)
             return
@@ -1194,8 +1211,10 @@ ApplicationWindow {
             return
         }
 
+        const historyBefore = captureHistoryCheckpoint()
         pushUndoSnapshot()
         if (!geometry.createFaceFromEdges(meshEdgeSelection)) {
+            restoreHistoryCheckpoint(historyBefore)
             setStatus("Face creation was rejected. Select one connected, closed loop that is planar and convex.")
             return
         }
@@ -1257,8 +1276,10 @@ ApplicationWindow {
 
         const selectedEdge = edgeIndexSpinner.value
         const midpointIndex = geometry.vertexCount
+        const historyBefore = captureHistoryCheckpoint()
         pushUndoSnapshot()
         if (!geometry.subdivideEdge(selectedEdge)) {
+            restoreHistoryCheckpoint(historyBefore)
             setStatus("Edge subdivision was rejected; the mesh remains unchanged.")
             return
         }
@@ -1281,8 +1302,10 @@ ApplicationWindow {
             return
         }
 
+        const historyBefore = captureHistoryCheckpoint()
         pushUndoSnapshot()
         if (!geometry.createFace(meshVertexSelection)) {
+            restoreHistoryCheckpoint(historyBefore)
             setStatus("Face creation failed. Choose unique, coplanar vertices around a convex boundary.")
             return
         }
@@ -1372,8 +1395,10 @@ ApplicationWindow {
         else if (axis === "y") y = value
         else if (axis === "z") z = value
 
+        const historyBefore = captureHistoryCheckpoint()
         pushUndoSnapshot()
         if (!geometry.setVertexPosition(vertexIndexSpinner.value, Qt.vector3d(x, y, z))) {
+            restoreHistoryCheckpoint(historyBefore)
             setStatus("The vertex update was rejected.")
             return
         }
@@ -1389,8 +1414,10 @@ ApplicationWindow {
             return
         }
 
+        const historyBefore = captureHistoryCheckpoint()
         pushUndoSnapshot()
         if (!geometry.extrudeFace(faceIndexSpinner.value, distance)) {
+            restoreHistoryCheckpoint(historyBefore)
             setStatus("Face extrusion failed. Choose a valid face and a non-zero distance.")
             return
         }
@@ -1410,8 +1437,10 @@ ApplicationWindow {
             return
         }
 
+        const historyBefore = captureHistoryCheckpoint()
         pushUndoSnapshot()
         if (!geometry.insetFace(faceIndexSpinner.value, distance)) {
+            restoreHistoryCheckpoint(historyBefore)
             setStatus("Inset failed. Use a smaller distance on a convex, planar face.")
             return
         }
@@ -1433,8 +1462,10 @@ ApplicationWindow {
             return
         }
 
+        const historyBefore = captureHistoryCheckpoint()
         pushUndoSnapshot()
         if (!geometry.deleteFace(faceIndexSpinner.value)) {
+            restoreHistoryCheckpoint(historyBefore)
             setStatus("Face deletion was rejected; the mesh has not changed.")
             return
         }
@@ -1463,8 +1494,10 @@ ApplicationWindow {
             return
         }
 
+        const historyBefore = captureHistoryCheckpoint()
         pushUndoSnapshot()
         if (!geometry.mergeVertices(sourceIndex, targetIndex)) {
+            restoreHistoryCheckpoint(historyBefore)
             setStatus("Vertex merge failed; the mesh was left unchanged.")
             return
         }

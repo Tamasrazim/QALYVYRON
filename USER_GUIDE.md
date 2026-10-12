@@ -63,7 +63,7 @@ For built-in editable mesh objects, the inspector offers six quick color swatche
 
 ## Undo and redo
 
-Use the **Undo** and **Redo** buttons in the toolbar. The current implementation keeps a bounded history of scene snapshots for common object, transform, material, camera, and light edits. Since this system is new, treat it as prototype functionality until it passes the full Windows runtime tests.
+Use the **Undo** and **Redo** buttons in the toolbar. The current implementation keeps a bounded history of scene snapshots for common object, transform, material, camera, and light edits. Since this system is new, treat it as prototype functionality until it passes the full Windows runtime tests. A mesh operation that is rejected for invalid topology leaves the model unchanged and also preserves the prior Undo/Redo history.
 
 ## Final render, save, reopen, and export
 

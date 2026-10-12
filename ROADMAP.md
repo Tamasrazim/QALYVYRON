@@ -50,6 +50,7 @@ This stage is what separates a scene viewer from a practical 3D creation tool.
 - [ ] Add pivot modes and fully reliable modeling selection.
 - [ ] Add subdivision and non-destructive modifier stacks with editable parameters.
 - [ ] Make mesh operations undoable and test them against invalid or degenerate geometry.
+- [x] Preserve existing Undo/Redo and unsaved-state history when an atomic mesh operation is rejected.
 - [ ] Save mesh topology in the native project format and migrate older projects safely.
 
 **Acceptance:** build a non-trivial mesh from primitives, edit its topology, save it, reopen it, and continue editing without losing topology or material assignments.
