@@ -46,6 +46,8 @@ ApplicationWindow {
     property real orbitDistance: 470
     // Parallel projection is useful for proportion checks and axis-aligned modeling views.
     property bool orthographicMode: false
+    // The fill light uses one saved position for the viewport and final renderer.
+    property vector3d fillLightPosition: Qt.vector3d(-160, 190, 140)
     property real gizmoX: 0
     property real gizmoY: 0
     property real gizmoDepth: 1
@@ -335,6 +337,47 @@ ApplicationWindow {
         if (shape === "Cone") return "#Cone"
         if (shape === "Plane") return "#Rectangle"
         return "#Cube"
+    }
+
+    // Refresh the numeric light fields after opening, resetting, undoing, or redoing a scene.
+    function refreshFillLightPositionFields() {
+        fillLightXField.text = Number(fillLightPosition.x).toFixed(1)
+        fillLightYField.text = Number(fillLightPosition.y).toFixed(1)
+        fillLightZField.text = Number(fillLightPosition.z).toFixed(1)
+    }
+
+    // Change only one light axis. Invalid edits leave the live scene untouched.
+    function updateFillLightPosition(axis, inputText) {
+        const parsed = Number(inputText)
+        if (!Number.isFinite(parsed)) {
+            refreshFillLightPositionFields()
+            setStatus("Enter a valid fill-light coordinate.")
+            return
+        }
+
+        const current = fillLightPosition
+        let x = current.x, y = current.y, z = current.z
+        const value = Math.max(-1000, Math.min(1000, parsed))
+        if (axis === "x") x = value
+        else if (axis === "y") y = value
+        else if (axis === "z") z = value
+        else {
+            refreshFillLightPositionFields()
+            return
+        }
+
+        if (Math.abs(x - current.x) < 0.0001
+                && Math.abs(y - current.y) < 0.0001
+                && Math.abs(z - current.z) < 0.0001) {
+            refreshFillLightPositionFields()
+            return
+        }
+
+        // Snapshot first so Undo restores the exact previous light position.
+        pushUndoSnapshot()
+        fillLightPosition = Qt.vector3d(x, y, z)
+        refreshFillLightPositionFields()
+        setStatus("Updated fill-light position.")
     }
 
     function updateCamera() {
@@ -1541,8 +1584,10 @@ ApplicationWindow {
         orthographicMode = false
         keyLight.brightness = 1.7
         fillLight.brightness = 65
+        fillLightPosition = Qt.vector3d(-160, 190, 140)
         fillLight.color = "#ffffff"
         fillTintCombo.currentIndex = 0
+        refreshFillLightPositionFields()
         updateCamera()
         projectDirty = editorReady
         setStatus("New scene ready.")
@@ -1590,6 +1635,9 @@ ApplicationWindow {
                 cameraFov: camera.fieldOfView,
                 keyLightBrightness: keyLight.brightness,
                 fillLightBrightness: fillLight.brightness,
+                fillLightX: root.fillLightPosition.x,
+                fillLightY: root.fillLightPosition.y,
+                fillLightZ: root.fillLightPosition.z,
                 fillTintIndex: fillTintCombo.currentIndex,
                 orbitYaw: root.orbitYaw,
                 orbitPitch: root.orbitPitch,
@@ -1612,8 +1660,10 @@ ApplicationWindow {
         camera.fieldOfView = 45
         keyLight.brightness = 1.7
         fillLight.brightness = 65
+        fillLightPosition = Qt.vector3d(-160, 190, 140)
         fillLight.color = "#ffffff"
         fillTintCombo.currentIndex = 0
+        refreshFillLightPositionFields()
         orbitYaw = 34
         orbitPitch = 23
         orbitDistance = 470
@@ -1636,6 +1686,17 @@ ApplicationWindow {
             else
                 fillLight.color = "#ffffff"
         }
+
+        // Older scenes don't store the light position, so keep the old default for them.
+        const fillX = settings.fillLightX !== undefined && Number.isFinite(Number(settings.fillLightX))
+            ? Math.max(-1000, Math.min(1000, Number(settings.fillLightX))) : -160
+        const fillY = settings.fillLightY !== undefined && Number.isFinite(Number(settings.fillLightY))
+            ? Math.max(-1000, Math.min(1000, Number(settings.fillLightY))) : 190
+        const fillZ = settings.fillLightZ !== undefined && Number.isFinite(Number(settings.fillLightZ))
+            ? Math.max(-1000, Math.min(1000, Number(settings.fillLightZ))) : 140
+        fillLightPosition = Qt.vector3d(fillX, fillY, fillZ)
+        refreshFillLightPositionFields()
+
         if (settings.orbitYaw !== undefined && Number.isFinite(Number(settings.orbitYaw)))
             orbitYaw = Number(settings.orbitYaw)
         if (settings.orbitPitch !== undefined && Number.isFinite(Number(settings.orbitPitch)))
@@ -3223,7 +3284,7 @@ ApplicationWindow {
 
                             PointLight {
                                 id: fillLight
-                                position: Qt.vector3d(-160, 190, 140)
+                                position: root.fillLightPosition
                                 brightness: 65
                                 color: "#ffffff"
                                 quadraticFade: 0.00008
@@ -4337,15 +4398,48 @@ ApplicationWindow {
                         Text { text: Number(fillLight.brightness).toFixed(0); color: "#cecece"; font.pixelSize: 10 }
                     }
 
-                    Slider {
-                        id: fillBrightnessSlider
+                    Text {
                         visible: !root.beginnerMode
                         Layout.fillWidth: true
-                        from: 0
-                        to: 150
-                        value: fillLight.brightness
-                        onPressedChanged: if (pressed) root.pushUndoSnapshot()
-                        onMoved: fillLight.brightness = value
+                        text: "Fill light position (scene units)"
+                        color: root.secondaryText
+                        font.pixelSize: 10
+                    }
+
+                    GridLayout {
+                        visible: !root.beginnerMode
+                        Layout.fillWidth: true
+                        columns: 2
+                        columnSpacing: 8
+                        rowSpacing: 5
+
+                        Text { text: "X"; color: "#8f8f8f"; font.pixelSize: 11 }
+                        TextField {
+                            id: fillLightXField
+                            Layout.fillWidth: true
+                            text: "-160"
+                            selectByMouse: true
+                            validator: DoubleValidator { bottom: -1000; top: 1000 }
+                            onEditingFinished: root.updateFillLightPosition("x", text)
+                        }
+                        Text { text: "Y"; color: "#8f8f8f"; font.pixelSize: 11 }
+                        TextField {
+                            id: fillLightYField
+                            Layout.fillWidth: true
+                            text: "190"
+                            selectByMouse: true
+                            validator: DoubleValidator { bottom: -1000; top: 1000 }
+                            onEditingFinished: root.updateFillLightPosition("y", text)
+                        }
+                        Text { text: "Z"; color: "#8f8f8f"; font.pixelSize: 11 }
+                        TextField {
+                            id: fillLightZField
+                            Layout.fillWidth: true
+                            text: "140"
+                            selectByMouse: true
+                            validator: DoubleValidator { bottom: -1000; top: 1000 }
+                            onEditingFinished: root.updateFillLightPosition("z", text)
+                        }
                     }
 
                     ComboBox {

@@ -950,7 +950,13 @@ void FinalRenderer::runRender(QString outputPath,
             numberOr(settings, QStringLiteral("keyLightBrightness"), 1.7), 0.0, 4.0));
         const float fillBrightness = static_cast<float>(std::clamp(
             numberOr(settings, QStringLiteral("fillLightBrightness"), 65.0), 0.0, 150.0));
-        const QVector3D pointLightPosition(-160.0f, 190.0f, 140.0f);
+        const QVector3D pointLightPosition(
+            static_cast<float>(std::clamp(
+                numberOr(settings, QStringLiteral("fillLightX"), -160.0), -1000.0, 1000.0)),
+            static_cast<float>(std::clamp(
+                numberOr(settings, QStringLiteral("fillLightY"), 190.0), -1000.0, 1000.0)),
+            static_cast<float>(std::clamp(
+                numberOr(settings, QStringLiteral("fillLightZ"), 140.0), -1000.0, 1000.0)));
         const int fillTintIndex = static_cast<int>(std::clamp(
             numberOr(settings, QStringLiteral("fillTintIndex"), 0.0), 0.0, 2.0));
         const QVector3D fillTint = fillTintIndex == 1

@@ -72,6 +72,7 @@ private slots:
     void offlineRenderRespectsViewportFocusTarget();
     void metalnessChangesFinalRenderAppearance();
     void smoothShadingChangesFinalRenderAppearance();
+    void fillLightPositionChangesFinalRenderAppearance();
     void orthographicProjectionChangesFinalRender();
     void writesPngFromSceneGeometry();
 };
@@ -260,7 +261,61 @@ void FinalRendererTests::metalnessChangesFinalRenderAppearance()
     QVERIFY(!renderer.busy());
 }
 
+void FinalRendererTests::fillLightPositionChangesFinalRenderAppearance()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    auto sceneWithFillLightX = [](double x) {
+        QVariantMap scene = smallPlaneScene();
+        QVariantMap settings = scene.value(QStringLiteral("settings")).toMap();
+        settings.insert(QStringLiteral("fillLightX"), x);
+        settings.insert(QStringLiteral("fillLightY"), 180.0);
+        settings.insert(QStringLiteral("fillLightZ"), 140.0);
+        scene.insert(QStringLiteral("settings"), settings);
+        return scene;
+    };
+
+    FinalRenderer renderer;
+    QSignalSpy finished(&renderer, &FinalRenderer::renderFinished);
+    QVERIFY(finished.isValid());
+
+    const QString nearPath = directory.filePath(QStringLiteral("fill-light-near.png"));
+    QVERIFY(renderer.startRender(QUrl::fromLocalFile(nearPath),
+                                 sceneWithFillLightX(-160.0), 64, 64, 2, 0));
+    QTRY_VERIFY_WITH_TIMEOUT(!finished.isEmpty(), 10000);
+    const QList<QVariant> nearResult = finished.takeFirst();
+    QVERIFY2(nearResult.at(0).toBool(), qPrintable(nearResult.at(1).toString()));
+    const QImage nearImage(nearPath);
+    QVERIFY(!nearImage.isNull());
+
+    const QString farPath = directory.filePath(QStringLiteral("fill-light-far.png"));
+    QVERIFY(renderer.startRender(QUrl::fromLocalFile(farPath),
+                                 sceneWithFillLightX(800.0), 64, 64, 2, 0));
+    QTRY_VERIFY_WITH_TIMEOUT(!finished.isEmpty(), 10000);
+    const QList<QVariant> farResult = finished.takeFirst();
+    QVERIFY2(farResult.at(0).toBool(), qPrintable(farResult.at(1).toString()));
+    const QImage farImage(farPath);
+    QVERIFY(!farImage.isNull());
+
+    qint64 totalPixelDifference = 0;
+    for (int y = 0; y < nearImage.height(); ++y) {
+        const auto *nearRow = reinterpret_cast<const QRgb *>(nearImage.constScanLine(y));
+        const auto *farRow = reinterpret_cast<const QRgb *>(farImage.constScanLine(y));
+        for (int x = 0; x < nearImage.width(); ++x) {
+            totalPixelDifference += std::abs(qRed(nearRow[x]) - qRed(farRow[x]));
+            totalPixelDifference += std::abs(qGreen(nearRow[x]) - qGreen(farRow[x]));
+            totalPixelDifference += std::abs(qBlue(nearRow[x]) - qBlue(farRow[x]));
+        }
+    }
+
+    QVERIFY2(totalPixelDifference > 100,
+             "Changing the saved fill-light X position must affect final render lighting.");
+    QVERIFY(!renderer.busy());
+}
+
 void FinalRendererTests::orthographicProjectionChangesFinalRender()
+
 {
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
