@@ -98,9 +98,21 @@ void EditableGeometryTests::closedEdgeLoopCreatesFaceForDeletedSurface()
     }
 
     QCOMPARE(boundaryEdges.size(), 4);
-    QVERIFY(geometry.createFaceFromEdges(boundaryEdges));
+
+    // Deliberately put the 4–7 edge first, which produces the opposite winding
+    // from the natural +Z cap if ordering depends on which edge was clicked first.
+    QVariantList arbitraryOrder;
+    for (const QVariant &edgeIndex : boundaryEdges) {
+        const QVariantList endpoints = geometry.edgeVertexIndices(edgeIndex.toInt());
+        if (endpoints.at(0).toInt() == 4 && endpoints.at(1).toInt() == 7)
+            arbitraryOrder.prepend(edgeIndex);
+        else
+            arbitraryOrder.append(edgeIndex);
+    }
+    QVERIFY(geometry.createFaceFromEdges(arbitraryOrder));
     QCOMPARE(geometry.faceCount(), originalFaceCount + 1);
     QCOMPARE(geometry.vertexCount(), 8);
+    QVERIFY(geometry.faceNormal(geometry.faceCount() - 1).z() > 0.99f);
 }
 
 void EditableGeometryTests::invalidEdgeLoopsAreRejectedAtomically()

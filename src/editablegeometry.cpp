@@ -722,6 +722,52 @@ bool EditableGeometry::createFaceFromEdges(const QVariantList &edgeIndices)
     if (orderedVertices.size() != selectedEdges.size())
         return false;
 
+    // When a loop borders an open boundary (for example, a deleted face),
+    // orient the new cap opposite to the directed boundary of its existing
+    // neighbour faces. The user may select edges in any order, so do not let
+    // click order arbitrarily flip the resulting face normal.
+    const auto edgeKey = [](int a, int b) {
+        const int low = std::min(a, b);
+        const int high = std::max(a, b);
+        return (static_cast<quint64>(static_cast<quint32>(low)) << 32)
+            | static_cast<quint32>(high);
+    };
+    QHash<quint64, QVector<QPair<int, int>>> edgeUses;
+    for (const QVector<int> &face : m_faces) {
+        if (face.size() < 2)
+            continue;
+        for (int i = 0; i < face.size(); ++i) {
+            const int a = face.at(i);
+            const int b = face.at((i + 1) % face.size());
+            if (a < 0 || b < 0 || a >= m_vertices.size()
+                || b >= m_vertices.size() || a == b) {
+                continue;
+            }
+            edgeUses[edgeKey(a, b)].append(qMakePair(a, b));
+        }
+    }
+
+    int orientationAgreements = 0;
+    int orientationConflicts = 0;
+    for (int i = 0; i < orderedVertices.size(); ++i) {
+        const int a = orderedVertices.at(i);
+        const int b = orderedVertices.at((i + 1) % orderedVertices.size());
+        const auto uses = edgeUses.value(edgeKey(a, b));
+        if (uses.size() != 1)
+            continue;
+
+        const QPair<int, int> adjacentDirection = uses.first();
+        if (a == adjacentDirection.second && b == adjacentDirection.first)
+            ++orientationAgreements; // Cap edge opposes its existing neighbour.
+        else if (a == adjacentDirection.first && b == adjacentDirection.second)
+            ++orientationConflicts;
+    }
+
+    if (orientationAgreements > 0 && orientationConflicts > 0)
+        return false; // Inconsistent boundary winding is not safe to fill.
+    if (orientationConflicts > 0)
+        std::reverse(orderedVertices.begin(), orderedVertices.end());
+
     QVariantList orderedIndices;
     orderedIndices.reserve(orderedVertices.size());
     for (const int vertexIndex : orderedVertices)
