@@ -63,6 +63,13 @@ ApplicationWindow {
     // It only affects mouse dragging; exact numeric transform fields stay exact.
     property bool snapMovementToGrid: false
     property real movementSnapStep: 10
+    // State for axis-constrained movement. The gizmo stays still while its handle is dragged.
+    property bool axisMoveActive: false
+    property string axisMoveName: ""
+    property var axisMoveStartPosition: Qt.vector3d(0, 0, 0)
+    property point axisMoveStartPointer: Qt.point(0, 0)
+    property point axisMoveProjectedVector: Qt.point(0, 0)
+    property bool axisMoveHistorySaved: false
     property int requestedRenderWidth: 1920
     property int requestedRenderHeight: 1080
     property int requestedRenderSamples: 8
@@ -305,6 +312,128 @@ ApplicationWindow {
 
         // Round each world-space coordinate to the nearest chosen grid step.
         return Math.round(value / movementSnapStep) * movementSnapStep
+    }
+
+    function worldAxisScreenVector(axis, position) {
+        // Project a 100-unit move along a world axis into screen pixels.
+        const axisDistance = 100
+        let axisEnd = Qt.vector3d(position.x, position.y, position.z)
+        if (axis === "x")
+            axisEnd = Qt.vector3d(position.x + axisDistance, position.y, position.z)
+        else if (axis === "y")
+            axisEnd = Qt.vector3d(position.x, position.y + axisDistance, position.z)
+        else
+            axisEnd = Qt.vector3d(position.x, position.y, position.z + axisDistance)
+
+        const startOnScreen = view3d.mapFrom3DScene(position)
+        const endOnScreen = view3d.mapFrom3DScene(axisEnd)
+        return Qt.point(endOnScreen.x - startOnScreen.x,
+                        endOnScreen.y - startOnScreen.y)
+    }
+
+    function gizmoAxisProjectionPosition() {
+        // Keep handles steady while dragging; the gizmo catches up when released.
+        if (axisMoveActive)
+            return axisMoveStartPosition
+        return selectedObject ? selectedObject.position : Qt.vector3d(0, 0, 0)
+    }
+
+    function gizmoAxisHandlePoint(axis) {
+        if (!selectedObject)
+            return Qt.point(-1000, -1000)
+
+        const projected = worldAxisScreenVector(axis, gizmoAxisProjectionPosition())
+        const length = Math.sqrt(projected.x * projected.x + projected.y * projected.y)
+        // Hide an axis handle when it points almost straight into the camera.
+        if (!Number.isFinite(length) || length < 1.0)
+            return Qt.point(-1000, -1000)
+
+        const handleDistance = 29
+        return Qt.point(38 + projected.x / length * handleDistance,
+                        38 + projected.y / length * handleDistance)
+    }
+
+    function gizmoAxisRotation(axis) {
+        const projected = worldAxisScreenVector(axis, gizmoAxisProjectionPosition())
+        return Math.atan2(projected.y, projected.x) * 180 / Math.PI
+    }
+
+    function beginAxisMove(axis, pointerX, pointerY) {
+        if (!selectedObject || selectedIndex < 0)
+            return false
+
+        const projected = worldAxisScreenVector(axis, selectedObject.position)
+        const lengthSquared = projected.x * projected.x + projected.y * projected.y
+        if (!Number.isFinite(lengthSquared) || lengthSquared < 1.0) {
+            setStatus("That axis points almost straight at the camera. Try Front, Top, or Side view.")
+            return false
+        }
+
+        axisMoveName = axis
+        axisMoveStartPosition = selectedObject.position
+        axisMoveStartPointer = Qt.point(pointerX, pointerY)
+        axisMoveProjectedVector = projected
+        axisMoveHistorySaved = false
+        axisMoveActive = true
+        setStatus("Drag the " + axis.toUpperCase() + " handle to move along that world axis.")
+        return true
+    }
+
+    function updateAxisMove(axis, pointerX, pointerY) {
+        if (!axisMoveActive || axis !== axisMoveName || !selectedObject || selectedIndex < 0)
+            return
+
+        const projected = axisMoveProjectedVector
+        const lengthSquared = projected.x * projected.x + projected.y * projected.y
+        if (lengthSquared < 1.0)
+            return
+
+        // Project the mouse movement onto the screen direction of the chosen 3D axis.
+        const mouseX = pointerX - axisMoveStartPointer.x
+        const mouseY = pointerY - axisMoveStartPointer.y
+        const worldDistance = (mouseX * projected.x + mouseY * projected.y)
+                              / lengthSquared * 100
+        if (!Number.isFinite(worldDistance))
+            return
+
+        // Change only the chosen coordinate; leave the other two exactly where they were.
+        const start = axisMoveStartPosition
+        let x = start.x
+        let y = start.y
+        let z = start.z
+        if (axisMoveName === "x")
+            x = snapMovementValue(start.x + worldDistance)
+        else if (axisMoveName === "y")
+            y = snapMovementValue(start.y + worldDistance)
+        else
+            z = snapMovementValue(start.z + worldDistance)
+
+        const current = selectedObject.position
+        if (Math.abs(current.x - x) < 0.0001
+                && Math.abs(current.y - y) < 0.0001
+                && Math.abs(current.z - z) < 0.0001)
+            return
+
+        if (!axisMoveHistorySaved) {
+            // Save one undo step before the first real change, not on a simple click.
+            pushUndoSnapshot()
+            axisMoveHistorySaved = true
+        }
+
+        selectedObject.position = Qt.vector3d(x, y, z)
+        objectList.setProperty(selectedIndex, "x", x)
+        objectList.setProperty(selectedIndex, "y", y)
+        objectList.setProperty(selectedIndex, "z", z)
+        refreshInspector()
+    }
+
+    function endAxisMove() {
+        if (!axisMoveActive)
+            return
+        axisMoveActive = false
+        axisMoveName = ""
+        axisMoveHistorySaved = false
+        Qt.callLater(root.updateGizmo)
     }
 
     function objectFrameRadius(object) {
@@ -2964,21 +3093,22 @@ ApplicationWindow {
                             width: 76
                             height: 76
 
-                            Rectangle {
-                                x: 12
-                                y: parent.height / 2 - 1
-                                width: parent.width - 24
-                                height: 2
-                                color: "#d6d6d6"
-                                opacity: 0.9
-                            }
-                            Rectangle {
-                                x: parent.width / 2 - 1
-                                y: 12
-                                width: 2
-                                height: parent.height - 24
-                                color: "#d6d6d6"
-                                opacity: 0.9
+                            Repeater {
+                                model: ["x", "y", "z"]
+                                delegate: Rectangle {
+                                    required property string modelData
+                                    readonly property point axisPoint: root.gizmoAxisHandlePoint(modelData)
+                                    x: transformGizmo.width / 2
+                                    y: transformGizmo.height / 2 - height / 2
+                                    width: 29
+                                    height: 2
+                                    visible: axisPoint.x > -100
+                                    transformOrigin: Item.Left
+                                    rotation: root.gizmoAxisRotation(modelData)
+                                    color: modelData === "x" ? "#eeeeee"
+                                         : modelData === "y" ? "#bdbdbd" : "#858585"
+                                    opacity: 0.95
+                                }
                             }
                             Rectangle {
                                 anchors.centerIn: parent
@@ -3068,6 +3198,53 @@ ApplicationWindow {
                                     dragObject = null
                                     historySaved = false
                                     root.updateGizmo()
+                                }
+                            }
+                            // The labeled end handles move on one world axis at a time.
+                            Repeater {
+                                model: ["x", "y", "z"]
+                                delegate: Rectangle {
+                                    required property string modelData
+                                    readonly property point axisPoint: root.gizmoAxisHandlePoint(modelData)
+                                    width: 17
+                                    height: 17
+                                    radius: 5
+                                    x: axisPoint.x - width / 2
+                                    y: axisPoint.y - height / 2
+                                    visible: axisPoint.x > -100
+                                    color: modelData === "x" ? "#eeeeee"
+                                         : modelData === "y" ? "#bdbdbd" : "#858585"
+                                    border.color: "#111111"
+                                    border.width: 1
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: modelData.toUpperCase()
+                                        color: "#111111"
+                                        font.pixelSize: 9
+                                        font.bold: true
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        acceptedButtons: Qt.LeftButton
+                                        cursorShape: pressed ? Qt.ClosedHandCursor : Qt.PointingHandCursor
+
+                                        onPressed: function(mouse) {
+                                            const pointer = mapToItem(root, mouse.x, mouse.y)
+                                            root.beginAxisMove(modelData, pointer.x, pointer.y)
+                                        }
+
+                                        onPositionChanged: function(mouse) {
+                                            if (!pressed)
+                                                return
+                                            const pointer = mapToItem(root, mouse.x, mouse.y)
+                                            root.updateAxisMove(modelData, pointer.x, pointer.y)
+                                        }
+
+                                        onReleased: root.endAxisMove()
+                                        onCanceled: root.endAxisMove()
+                                    }
                                 }
                             }
                         }

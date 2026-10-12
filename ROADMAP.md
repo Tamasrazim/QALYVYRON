@@ -35,7 +35,8 @@ This stage is what separates a scene viewer from a practical 3D creation tool.
 - [x] Add selected-object focus and approximate scene-wide framing, with the view target saved and restored in project files.
 - [x] Add optional world-grid snapping for viewport object dragging, with selectable step sizes.
 - [x] Provide numeric position, rotation, and uniform-scale fields for the selected object.
-- [ ] Add pivot modes, axis-constrained transform gizmos, and fully reliable modeling selection.
+- [x] Add draggable X/Y/Z world-axis handles to constrain object movement in the viewport.
+- [ ] Add pivot modes and fully reliable modeling selection.
 - [ ] Add subdivision and non-destructive modifier stacks with editable parameters.
 - [ ] Make mesh operations undoable and test them against invalid or degenerate geometry.
 - [ ] Save mesh topology in the native project format and migrate older projects safely.
