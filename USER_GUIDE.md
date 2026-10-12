@@ -46,10 +46,12 @@ Choose **Import 3D Asset** and select a local:
 - glTF 2.0 binary: `.glb`
 - glTF 2.0 JSON: `.gltf`
 - Wavefront OBJ: `.obj`
+- STL triangle mesh: `.stl`
 
 OBJ and glTF use different import paths:
 
 - **Wavefront OBJ:** QALYVYRON parses vertex positions and polygon faces into its own editable mesh data. The imported geometry is embedded in the `.qvscene` file, so the original OBJ is no longer needed to reopen that mesh. It can be edited through **Edit Selected Mesh** and written back out through **Export OBJ**.
+- **STL:** both ASCII STL and binary STL triangles import as editable mesh topology. Adjacent triangles with matching corner coordinates are joined at shared vertices. **Export STL** writes a binary STL, triangulates visible editable faces, and includes object position, rotation, and scale. The current STL path is geometry-only: normals are recomputed and STL color/material extensions are not preserved.
 - **glTF 2.0 (.glb/.gltf):** loaded by Qt Quick 3D's runtime loader for preview and placement. This path remains read-only and stores the source file's local URL. Keep the source file and its dependent assets in the same location when reopening the scene.
 
 The current OBJ importer is geometry-only. It does not yet preserve texture coordinates, imported normals, MTL material libraries, or textures. Full material/texture preservation and asset collection are still planned.
@@ -74,6 +76,7 @@ Use the **Undo** and **Redo** buttons in the toolbar. The current implementation
 - Saving writes a validated `.qvscene` project, including embedded editable OBJ geometry and mesh edits.
 - **Open:** reads a supported QALYVYRON scene file.
 - **Export OBJ:** writes editable mesh objects to a Wavefront OBJ file and bakes object position, rotation, and scale into the output vertices. Read-only glTF runtime-loaded objects are skipped with a warning.
+- **Export STL:** writes visible editable geometry to a binary STL file. Polygon faces are triangulated, transforms are baked into the exported vertices, and hidden or read-only imported objects are skipped with a warning.
 - **Export Preview:** writes a PNG of the live viewport.
 
 The preview PNG is the current viewport image. The **Render Image** command is the separate offline render path. The current renderer has hard shadows and simple diffuse indirect bounces; soft shadows, denoising, advanced PBR nodes, textures, and read-only GLB/glTF source geometry are not yet part of final rendering.

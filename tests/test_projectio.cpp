@@ -18,6 +18,8 @@ private slots:
     void rejectsMalformedJson();
     void importsObjAndExportsWorldTransformedMeshes();
     void rejectsMalformedObjFaces();
+    void importsAsciiStlAndExportsWorldTransformedBinaryStl();
+    void rejectsMalformedStl();
     void remembersWelcomePreference();
 };
 
@@ -146,6 +148,104 @@ void ProjectIOTests::importsObjAndExportsWorldTransformedMeshes()
     QVERIFY(result.contains("v 10 0 0"));
     QVERIFY(result.contains("v 12 0 0"));
     QVERIFY(result.contains("f 1 2 3 4"));
+}
+
+void ProjectIOTests::importsAsciiStlAndExportsWorldTransformedBinaryStl()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    const QString inputPath = directory.filePath(QStringLiteral("triangle.stl"));
+    QFile input(inputPath);
+    QVERIFY(input.open(QIODevice::WriteOnly | QIODevice::Text));
+    const QByteArray asciiStl =
+        "solid triangle\n"
+        "  facet normal 0 0 1\n"
+        "    outer loop\n"
+        "      vertex 0 0 0\n"
+        "      vertex 1 0 0\n"
+        "      vertex 0 1 0\n"
+        "    endloop\n"
+        "  endfacet\n"
+        "endsolid triangle\n";
+    QCOMPARE(input.write(asciiStl), qint64(asciiStl.size()));
+    input.close();
+
+    ProjectIO io;
+    const QVariantMap imported = io.importStl(QUrl::fromLocalFile(inputPath));
+    QVERIFY2(imported.value(QStringLiteral("ok")).toBool(),
+             qPrintable(imported.value(QStringLiteral("error")).toString()));
+    const QVariantMap mesh = imported.value(QStringLiteral("mesh")).toMap();
+    QCOMPARE(mesh.value(QStringLiteral("vertices")).toList().size(), 3);
+    QCOMPARE(mesh.value(QStringLiteral("faces")).toList().size(), 1);
+
+    // Export bakes object transforms into the standard STL triangle coordinates.
+    const QVariantMap object{
+        {QStringLiteral("id"), QStringLiteral("object-1")},
+        {QStringLiteral("label"), QStringLiteral("Moved Triangle")},
+        {QStringLiteral("shape"), QStringLiteral("Custom")},
+        {QStringLiteral("kind"), QStringLiteral("primitive")},
+        {QStringLiteral("mesh"), mesh},
+        {QStringLiteral("x"), 10.0},
+        {QStringLiteral("y"), 0.0},
+        {QStringLiteral("z"), 0.0},
+        {QStringLiteral("rx"), 0.0},
+        {QStringLiteral("ry"), 0.0},
+        {QStringLiteral("rz"), 0.0},
+        {QStringLiteral("scale"), 1.0},
+        {QStringLiteral("visible"), true}
+    };
+    const QVariantMap document{
+        {QStringLiteral("format"), QStringLiteral("qalyvyron.scene")},
+        {QStringLiteral("version"), 1},
+        {QStringLiteral("objects"), QVariantList{object}}
+    };
+
+    const QString outputPath = directory.filePath(QStringLiteral("transformed.stl"));
+    const QVariantMap exported = io.exportStl(QUrl::fromLocalFile(outputPath), document);
+    QVERIFY2(exported.value(QStringLiteral("ok")).toBool(),
+             qPrintable(exported.value(QStringLiteral("error")).toString()));
+    QCOMPARE(exported.value(QStringLiteral("exportedTriangles")).toInt(), 1);
+    QCOMPARE(QFileInfo(outputPath).size(), qint64(134)); // 84-byte header + one 50-byte triangle.
+
+    // Re-importing the binary file proves the writer and the binary reader agree on the format.
+    const QVariantMap roundTrip = io.importStl(QUrl::fromLocalFile(outputPath));
+    QVERIFY2(roundTrip.value(QStringLiteral("ok")).toBool(),
+             qPrintable(roundTrip.value(QStringLiteral("error")).toString()));
+    const QVariantMap roundTripMesh = roundTrip.value(QStringLiteral("mesh")).toMap();
+    QCOMPARE(roundTripMesh.value(QStringLiteral("faces")).toList().size(), 1);
+    const QVariantList firstVertex =
+        roundTripMesh.value(QStringLiteral("vertices")).toList().first().toList();
+    QCOMPARE(firstVertex.size(), 3);
+    QVERIFY(std::abs(firstVertex.at(0).toDouble() - 10.0) < 1.0e-5);
+}
+
+void ProjectIOTests::rejectsMalformedStl()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    const QString path = directory.filePath(QStringLiteral("broken.stl"));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
+    const QByteArray malformed =
+        "solid broken\n"
+        "facet normal 0 0 1\n"
+        "outer loop\n"
+        "vertex nope 0 0\n"
+        "vertex 1 0 0\n"
+        "vertex 0 1 0\n"
+        "endloop\n"
+        "endfacet\n"
+        "endsolid broken\n";
+    QCOMPARE(file.write(malformed), qint64(malformed.size()));
+    file.close();
+
+    ProjectIO io;
+    const QVariantMap result = io.importStl(QUrl::fromLocalFile(path));
+    QVERIFY(!result.value(QStringLiteral("ok")).toBool());
+    QVERIFY(!result.value(QStringLiteral("error")).toString().isEmpty());
+    QVERIFY(!result.contains(QStringLiteral("mesh")));
 }
 
 void ProjectIOTests::rejectsMalformedObjFaces()

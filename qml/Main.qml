@@ -695,16 +695,22 @@ ApplicationWindow {
 
     function createImportedAsset(sourceUrl) {
         const sourceText = String(sourceUrl || "")
-        if (/\.obj$/i.test(sourceText.split(/[?#]/)[0])) {
-            const result = projectIO.importObj(sourceUrl)
+        const extensionPath = sourceText.split(/[?#]/)[0]
+        const isStl = /\.stl$/i.test(extensionPath)
+        const isObj = /\.obj$/i.test(extensionPath)
+        if (isObj || isStl) {
+            // STL and OBJ become editable native meshes rather than read-only runtime assets.
+            const result = isStl ? projectIO.importStl(sourceUrl) : projectIO.importObj(sourceUrl)
+            const formatLabel = isStl ? "STL" : "OBJ"
             if (!result.ok) {
-                setStatus("OBJ import failed: " + result.error)
+                setStatus(formatLabel + " import failed: " + result.error)
                 return
             }
 
             pushUndoSnapshot()
+            const importedLabel = result.label || ("Imported " + formatLabel + " Mesh")
             addPrimitive("Custom", {
-                label: result.label || "Imported OBJ Mesh",
+                label: importedLabel,
                 x: objectList.count * 120,
                 y: 0,
                 z: 0,
@@ -713,7 +719,7 @@ ApplicationWindow {
                 roughness: 0.48,
                 mesh: result.mesh
             })
-            setStatus("Imported editable OBJ mesh: " + (result.label || "Mesh") + ".")
+            setStatus("Imported editable " + formatLabel + " mesh: " + importedLabel + ".")
             return
         }
 
@@ -2105,10 +2111,11 @@ ApplicationWindow {
         title: "Import 3D Asset"
         fileMode: FileDialog.OpenFile
         nameFilters: [
-            "Supported 3D assets (*.glb *.gltf *.obj)",
+            "Supported 3D assets (*.glb *.gltf *.obj *.stl)",
             "glTF binary (*.glb)",
             "glTF scenes (*.gltf)",
-            "Wavefront OBJ (*.obj)"
+            "Wavefront OBJ (*.obj)",
+            "STL triangle mesh (*.stl)"
         ]
 
         onAccepted: root.createImportedAsset(selectedFile)
@@ -2216,6 +2223,25 @@ ApplicationWindow {
                 root.setStatus("OBJ exported to " + result.path + ". " + result.warning)
             } else {
                 root.setStatus("OBJ exported to " + result.path)
+            }
+        }
+    }
+
+    FileDialog {
+        id: exportStlDialog
+        title: "Export Visible Editable Meshes as Binary STL"
+        fileMode: FileDialog.SaveFile
+        nameFilters: ["STL triangle mesh (*.stl)"]
+        defaultSuffix: "stl"
+
+        onAccepted: {
+            const result = projectIO.exportStl(selectedFile, root.serializeScene())
+            if (!result.ok) {
+                root.setStatus("STL export failed: " + result.error)
+            } else if (result.warning) {
+                root.setStatus("STL exported to " + result.path + ". " + result.warning)
+            } else {
+                root.setStatus("STL exported to " + result.path)
             }
         }
     }
@@ -2550,6 +2576,10 @@ ApplicationWindow {
                     onClicked: exportObjDialog.open()
                 }
                 Button {
+                    text: "Export STL"
+                    onClicked: exportStlDialog.open()
+                }
+                Button {
                     text: "Export Preview"
                     highlighted: true
                     onClicked: exportImageDialog.open()
@@ -2631,7 +2661,7 @@ ApplicationWindow {
 
                     Text {
                         Layout.fillWidth: true
-                        text: "Open a model file (.glb, .gltf or .obj)."
+                        text: "Open a model file (.glb, .gltf, .obj or .stl)."
                         color: "#707070"
                         font.pixelSize: 9
                         wrapMode: Text.WordWrap

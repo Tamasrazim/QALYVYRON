@@ -4,7 +4,7 @@
 
 QALYVYRON is being developed as a local desktop tool for creating, editing, animating, and rendering 3D work without requiring Blender, a paid subscription, or a cloud account. The goal is not to imitate Blender's interface; it is to provide a workflow that is easier to discover, mouse-friendly by default, and capable of finishing real projects.
 
-**Status: active mainline development build — not yet a finished Blender replacement.** QALYVYRON now has an initial editable mesh kernel and a usable geometry-only OBJ import/export path, but it still lacks full edge/loop modeling, a full PBR material and texture pipeline, animation, soft shadows/denoising and complete production packaging. Those gaps remain explicit work items.
+**Status: active mainline development build — not yet a finished Blender replacement.** QALYVYRON now has an initial editable mesh kernel and geometry-only OBJ/STL import/export paths, but it still lacks full edge/loop modeling, a full PBR material and texture pipeline, animation, soft shadows/denoising and complete production packaging. Those gaps remain explicit work items.
 
 ## Implemented in the main build
 
@@ -19,7 +19,9 @@ QALYVYRON is being developed as a local desktop tool for creating, editing, anim
 - Versioned `.qvscene` project files with local save/open validation, including editable mesh topology. Save remembers the active project path; Save As creates a separate copy, common save/open/undo/redo shortcuts are available, and New/Open/window closing protect unsaved edits with Save, Discard, and Cancel choices. While edits are unsaved, a recovery snapshot is written to app-local storage about every 30 seconds. On next launch, a prompt offers restore or discard; saving or explicitly discarding clears the recovery copy without overwriting the original scene file.
 - Undo and redo history for common scene, transform, material, camera, and light edits.
 - **Wavefront OBJ (`.obj`) import:** vertex positions and polygon faces are parsed into QALYVYRON's editable mesh data. OBJ meshes are embedded in `.qvscene` projects and can be edited with indexed vertex coordinates and face extrusion.
+- **STL import:** reads ASCII and binary STL triangles, welds matching corner positions into a connected editable mesh, and enforces vertex/triangle/file-size limits.
 - **Wavefront OBJ export:** writes editable mesh objects with their scene transforms baked into exported vertex positions. Runtime-loaded `.glb`/`.gltf` assets are skipped with a clear warning.
+- **Binary STL export:** triangulates visible editable mesh faces and bakes object transforms into exported vertices. Hidden or read-only imported objects are skipped with a clear warning.
 - **glTF 2.0 (`.glb`, `.gltf`) preview import:** loaded by Qt Quick 3D's runtime loader. These objects remain read-only and reference their original local files.
 - CPU offline final PNG rendering from scene triangles with a BVH accelerator, multisample anti-aliasing, directional/point lighting, hard shadows, material roughness, and configurable diffuse indirect bounces. The final-render camera also honors the saved viewport focus target, so framing an object away from world origin works in the output PNG.
 - Separate viewport-preview PNG export for quick captures. It is not confused with a final offline render.

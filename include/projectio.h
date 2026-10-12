@@ -1,4 +1,4 @@
-// What this does: Declares the functions for opening and saving QALYVYRON scenes and exchanging geometry with OBJ files.
+// What this does: Declares the functions for opening and saving QALYVYRON scenes and exchanging geometry with OBJ and STL files.
 
 #pragma once
 
@@ -20,5 +20,8 @@ public:
     Q_INVOKABLE QVariantMap loadProject(const QUrl &url) const;
     Q_INVOKABLE QVariantMap importObj(const QUrl &url) const;
     Q_INVOKABLE QVariantMap exportObj(const QUrl &url,
+                                      const QVariantMap &document) const;
+    Q_INVOKABLE QVariantMap importStl(const QUrl &url) const;
+    Q_INVOKABLE QVariantMap exportStl(const QUrl &url,
                                       const QVariantMap &document) const;
 };

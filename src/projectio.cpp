@@ -2,8 +2,11 @@
 
 #include "projectio.h"
 
+#include <QByteArray>
+#include <QDataStream>
 #include <QFile>
 #include <QFileInfo>
+#include <QHash>
 #include <QLocale>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -16,6 +19,7 @@
 #include <QSettings>
 #include <QTextStream>
 #include <QVector3D>
+#include <QtEndian>
 
 #include <cmath>
 #include <utility>
@@ -25,6 +29,8 @@ namespace
 constexpr qint64 kMaximumProjectBytes = 64 * 1024 * 1024;
 constexpr qint64 kMaximumObjBytes = 128 * 1024 * 1024;
 constexpr qint64 kMaximumObjExportBytes = 256 * 1024 * 1024;
+constexpr qint64 kMaximumStlBytes = 128 * 1024 * 1024;
+constexpr quint32 kMaximumStlTriangles = 100000;
 constexpr int kMaximumSceneObjects = 10000;
 constexpr int kMaximumMeshVertices = 100000;
 constexpr int kMaximumMeshFaces = 100000;
@@ -429,6 +435,227 @@ QVariantMap ProjectIO::importObj(const QUrl &url) const
             {QStringLiteral("path"), info.absoluteFilePath()}};
 }
 
+
+QVariantMap ProjectIO::importStl(const QUrl &url) const
+{
+    const QString path = localPath(url);
+    if (path.isEmpty())
+        return failure(QStringLiteral("Choose a local STL file."));
+
+    const QFileInfo info(path);
+    if (!info.exists() || !info.isFile()
+        || info.suffix().compare(QStringLiteral("stl"), Qt::CaseInsensitive) != 0) {
+        return failure(QStringLiteral("The selected file is not an STL mesh."));
+    }
+    if (info.size() < 1 || info.size() > kMaximumStlBytes)
+        return failure(QStringLiteral("The STL file is empty or exceeds the 128 MiB import limit."));
+
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly))
+        return failure(QStringLiteral("Could not open the STL file: %1").arg(file.errorString()));
+
+    const QByteArray bytes = file.readAll();
+    if (file.error() != QFileDevice::NoError)
+        return failure(QStringLiteral("An I/O error occurred while reading the STL file."));
+    if (bytes.isEmpty())
+        return failure(QStringLiteral("The STL file is empty."));
+
+    QVector<QVector3D> vertices;
+    QVector<QVector<int>> faces;
+    QHash<QString, int> vertexIndices;
+
+    // STL repeats corner coordinates for every triangle. Weld identical coordinates
+    // into one editable vertex so neighboring triangles share real mesh edges.
+    auto indexForVertex = [&](const QVector3D &vertex) -> int {
+        const QString key = QString::number(vertex.x(), 'g', 9) + QLatin1Char(',')
+            + QString::number(vertex.y(), 'g', 9) + QLatin1Char(',')
+            + QString::number(vertex.z(), 'g', 9);
+        const auto found = vertexIndices.constFind(key);
+        if (found != vertexIndices.cend())
+            return found.value();
+        if (vertices.size() >= kMaximumMeshVertices)
+            return -1;
+        const int index = vertices.size();
+        vertices.append(vertex);
+        vertexIndices.insert(key, index);
+        return index;
+    };
+
+    auto validVertex = [](const QVector3D &vertex) {
+        return std::isfinite(vertex.x()) && std::isfinite(vertex.y())
+            && std::isfinite(vertex.z())
+            && std::abs(vertex.x()) <= 1.0e6f
+            && std::abs(vertex.y()) <= 1.0e6f
+            && std::abs(vertex.z()) <= 1.0e6f;
+    };
+
+    QString parseError;
+    auto appendTriangle = [&](const QVector3D &a,
+                              const QVector3D &b,
+                              const QVector3D &c,
+                              quint32 triangleNumber) -> bool {
+        if (!validVertex(a) || !validVertex(b) || !validVertex(c)) {
+            parseError = QStringLiteral("STL triangle %1 contains a non-finite or out-of-range vertex.")
+                             .arg(triangleNumber);
+            return false;
+        }
+        if (faces.size() >= static_cast<int>(kMaximumStlTriangles)) {
+            parseError = QStringLiteral("STL exceeds the 100,000-triangle edit limit.");
+            return false;
+        }
+
+        const int aIndex = indexForVertex(a);
+        const int bIndex = indexForVertex(b);
+        const int cIndex = indexForVertex(c);
+        if (aIndex < 0 || bIndex < 0 || cIndex < 0) {
+            parseError = QStringLiteral("STL exceeds the 100,000-unique-vertex edit limit.");
+            return false;
+        }
+
+        const QVector<int> face{aIndex, bIndex, cIndex};
+        const QVector3D normal = faceNormal(face, vertices);
+        if (!std::isfinite(normal.x()) || !std::isfinite(normal.y())
+            || !std::isfinite(normal.z()) || normal.lengthSquared() < 1.0e-10f) {
+            parseError = QStringLiteral("STL triangle %1 is degenerate.").arg(triangleNumber);
+            return false;
+        }
+        faces.append(face);
+        return true;
+    };
+
+    // Binary STL is 80 header bytes, a 32-bit triangle count, then 50 bytes per triangle.
+    // Checking the exact length also avoids mistaking common ASCII files starting with "solid".
+    bool binaryStl = false;
+    quint32 binaryTriangleCount = 0;
+    if (bytes.size() >= 84) {
+        binaryTriangleCount = qFromLittleEndian<quint32>(
+            reinterpret_cast<const uchar *>(bytes.constData() + 80));
+        const qint64 expectedSize = 84LL + static_cast<qint64>(binaryTriangleCount) * 50LL;
+        binaryStl = binaryTriangleCount > 0
+            && binaryTriangleCount <= kMaximumStlTriangles
+            && expectedSize == bytes.size();
+    }
+
+    if (binaryStl) {
+        QByteArray mutableBytes = bytes;
+        QDataStream input(&mutableBytes, QIODevice::ReadOnly);
+        input.setByteOrder(QDataStream::LittleEndian);
+        input.setFloatingPointPrecision(QDataStream::SinglePrecision);
+
+        char header[80];
+        if (input.readRawData(header, 80) != 80)
+            return failure(QStringLiteral("The binary STL header is incomplete."));
+        quint32 declaredCount = 0;
+        input >> declaredCount;
+        if (input.status() != QDataStream::Ok || declaredCount != binaryTriangleCount)
+            return failure(QStringLiteral("The binary STL triangle count is invalid."));
+
+        for (quint32 triangle = 0; triangle < declaredCount; ++triangle) {
+            // Triangle normals are ignored because the editable mesh recomputes its own.
+            if (input.skipRawData(12) != 12)
+                return failure(QStringLiteral("Binary STL triangle %1 has a truncated normal.").arg(triangle + 1));
+
+            QVector3D points[3];
+            for (int corner = 0; corner < 3; ++corner) {
+                float x = 0.0f, y = 0.0f, z = 0.0f;
+                input >> x >> y >> z;
+                if (input.status() != QDataStream::Ok)
+                    return failure(QStringLiteral("Binary STL triangle %1 is truncated.").arg(triangle + 1));
+                points[corner] = QVector3D(x, y, z);
+            }
+            if (input.skipRawData(2) != 2)
+                return failure(QStringLiteral("Binary STL triangle %1 has a truncated attribute field.").arg(triangle + 1));
+
+            if (!appendTriangle(points[0], points[1], points[2], triangle + 1))
+                return failure(parseError);
+        }
+    } else {
+        const QByteArray trimmed = bytes.trimmed();
+        if (!trimmed.startsWith("solid", Qt::CaseInsensitive)) {
+            return failure(QStringLiteral("The STL file has an invalid binary length and does not look like an ASCII STL."));
+        }
+
+        QByteArray mutableBytes = bytes;
+        QTextStream input(&mutableBytes, QIODevice::ReadOnly);
+        QVector<QVector3D> pendingVertices;
+        pendingVertices.reserve(3);
+        quint32 triangleNumber = 0;
+        int lineNumber = 0;
+
+        while (!input.atEnd()) {
+            const QString line = input.readLine().trimmed();
+            ++lineNumber;
+            const QStringList tokens = line.split(QRegularExpression(QStringLiteral("\\s+")),
+                                                  Qt::SkipEmptyParts);
+            if (tokens.isEmpty()
+                || tokens.first().compare(QStringLiteral("vertex"), Qt::CaseInsensitive) != 0) {
+                continue;
+            }
+            if (tokens.size() < 4) {
+                return failure(QStringLiteral("ASCII STL line %1 has an incomplete vertex.")
+                                   .arg(lineNumber));
+            }
+
+            double xyz[3] = {};
+            for (int axis = 0; axis < 3; ++axis) {
+                if (!parseNumber(tokens.at(axis + 1), &xyz[axis])) {
+                    return failure(QStringLiteral("ASCII STL line %1 contains an invalid vertex coordinate.")
+                                       .arg(lineNumber));
+                }
+            }
+            pendingVertices.append(QVector3D(static_cast<float>(xyz[0]),
+                                             static_cast<float>(xyz[1]),
+                                             static_cast<float>(xyz[2])));
+            if (pendingVertices.size() == 3) {
+                ++triangleNumber;
+                if (!appendTriangle(pendingVertices.at(0), pendingVertices.at(1),
+                                    pendingVertices.at(2), triangleNumber)) {
+                    return failure(parseError);
+                }
+                pendingVertices.clear();
+            }
+        }
+
+        if (!pendingVertices.isEmpty())
+            return failure(QStringLiteral("ASCII STL ends with an incomplete triangle."));
+    }
+
+    if (faces.isEmpty())
+        return failure(QStringLiteral("The STL file contains no editable triangles."));
+
+    QVariantList serializedVertices;
+    serializedVertices.reserve(vertices.size());
+    for (const QVector3D &vertex : vertices) {
+        serializedVertices.append(QVariant::fromValue(QVariantList{
+            static_cast<double>(vertex.x()),
+            static_cast<double>(vertex.y()),
+            static_cast<double>(vertex.z())
+        }));
+    }
+
+    QVariantList serializedFaces;
+    serializedFaces.reserve(faces.size());
+    for (const QVector<int> &face : faces) {
+        QVariantList corners;
+        corners.reserve(face.size());
+        for (const int index : face)
+            corners.append(index);
+        serializedFaces.append(QVariant::fromValue(corners));
+    }
+
+    const QVariantMap mesh{
+        {QStringLiteral("shape"), QStringLiteral("Custom")},
+        {QStringLiteral("vertices"), serializedVertices},
+        {QStringLiteral("faces"), serializedFaces}
+    };
+
+    return {{QStringLiteral("ok"), true},
+            {QStringLiteral("mesh"), mesh},
+            {QStringLiteral("label"), info.completeBaseName()},
+            {QStringLiteral("path"), info.absoluteFilePath()},
+            {QStringLiteral("format"), QStringLiteral("stl")}};
+}
+
 QVariantMap ProjectIO::exportObj(const QUrl &url,
                                  const QVariantMap &document) const
 {
@@ -444,6 +671,11 @@ QVariantMap ProjectIO::exportObj(const QUrl &url,
     int skippedObjects = 0;
     for (const QVariant &rawObject : objects) {
         const QVariantMap object = rawObject.toMap();
+        if (object.contains(QStringLiteral("visible"))
+            && !object.value(QStringLiteral("visible")).toBool()) {
+            ++skippedObjects;
+            continue;
+        }
         if (object.value(QStringLiteral("kind")).toString() == QLatin1String("asset")) {
             ++skippedObjects;
             continue;
@@ -556,8 +788,190 @@ QVariantMap ProjectIO::exportObj(const QUrl &url,
     };
     if (skippedObjects > 0) {
         result.insert(QStringLiteral("warning"),
-                      QStringLiteral("%1 non-editable imported asset(s) were skipped. The OBJ contains only editable mesh objects.")
+                      QStringLiteral("%1 hidden or non-editable object(s) were skipped. The OBJ contains visible editable mesh objects only.")
                           .arg(skippedObjects));
     }
     return result;
 }
+
+
+QVariantMap ProjectIO::exportStl(const QUrl &url,
+                                 const QVariantMap &document) const
+{
+    const QString path = localPath(url);
+    if (path.isEmpty())
+        return failure(QStringLiteral("Choose a local STL output path."));
+
+    const QVariantList objects = document.value(QStringLiteral("objects")).toList();
+    if (objects.isEmpty() || objects.size() > kMaximumSceneObjects)
+        return failure(QStringLiteral("There are no scene objects to export, or the scene is too large."));
+
+    struct StlTriangle
+    {
+        QVector3D normal;
+        QVector3D a;
+        QVector3D b;
+        QVector3D c;
+    };
+
+    QVector<StlTriangle> triangles;
+    int skippedObjects = 0;
+    auto validWorldVertex = [](const QVector3D &point) {
+        return std::isfinite(point.x()) && std::isfinite(point.y())
+            && std::isfinite(point.z())
+            && std::abs(point.x()) <= 1.0e6f
+            && std::abs(point.y()) <= 1.0e6f
+            && std::abs(point.z()) <= 1.0e6f;
+    };
+
+    for (const QVariant &rawObject : objects) {
+        const QVariantMap object = rawObject.toMap();
+        // Keep hidden objects hidden in exported geometry too.
+        if (object.contains(QStringLiteral("visible"))
+            && !object.value(QStringLiteral("visible")).toBool()) {
+            ++skippedObjects;
+            continue;
+        }
+        if (object.value(QStringLiteral("kind")).toString() == QLatin1String("asset")) {
+            ++skippedObjects;
+            continue; // Runtime-loaded glTF geometry is not embedded in the scene mesh.
+        }
+
+        const QVariantMap mesh = object.value(QStringLiteral("mesh")).toMap();
+        if (mesh.isEmpty()) {
+            ++skippedObjects;
+            continue;
+        }
+
+        QVector<QVector3D> vertices;
+        QVector<QVector<int>> faces;
+        QString meshError;
+        if (!decodeMesh(mesh, &vertices, &faces, &meshError)) {
+            return failure(QStringLiteral("Cannot export %1: %2")
+                               .arg(object.value(QStringLiteral("label")).toString(), meshError));
+        }
+
+        auto readTransform = [&object](const QString &key, double fallback,
+                                       double minimum, double maximum,
+                                       double *value) -> bool {
+            if (!object.contains(key)) {
+                *value = fallback;
+                return true;
+            }
+            bool converted = false;
+            const double parsed = object.value(key).toDouble(&converted);
+            if (!converted || !std::isfinite(parsed)
+                || parsed < minimum || parsed > maximum) {
+                return false;
+            }
+            *value = parsed;
+            return true;
+        };
+
+        double x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, scale = 1;
+        if (!readTransform(QStringLiteral("x"), 0, -1.0e6, 1.0e6, &x)
+            || !readTransform(QStringLiteral("y"), 0, -1.0e6, 1.0e6, &y)
+            || !readTransform(QStringLiteral("z"), 0, -1.0e6, 1.0e6, &z)
+            || !readTransform(QStringLiteral("rx"), 0, -1.0e6, 1.0e6, &rx)
+            || !readTransform(QStringLiteral("ry"), 0, -1.0e6, 1.0e6, &ry)
+            || !readTransform(QStringLiteral("rz"), 0, -1.0e6, 1.0e6, &rz)
+            || !readTransform(QStringLiteral("scale"), 1, 0.0001, 10000, &scale)) {
+            return failure(QStringLiteral("Scene object has an invalid transform and cannot be exported."));
+        }
+
+        const QVector3D position(static_cast<float>(x), static_cast<float>(y), static_cast<float>(z));
+        const QQuaternion rotation = QQuaternion::fromEulerAngles(static_cast<float>(rx),
+                                                                  static_cast<float>(ry),
+                                                                  static_cast<float>(rz));
+        auto worldVertex = [&](int index) {
+            return rotation.rotatedVector(vertices.at(index) * static_cast<float>(scale))
+                + position;
+        };
+
+        for (const QVector<int> &face : faces) {
+            const QVector3D a = worldVertex(face.first());
+            if (!validWorldVertex(a))
+                return failure(QStringLiteral("World coordinates for '%1' are outside the STL safety range.")
+                                   .arg(object.value(QStringLiteral("label")).toString()));
+
+            for (int corner = 1; corner + 1 < face.size(); ++corner) {
+                const QVector3D b = worldVertex(face.at(corner));
+                const QVector3D c = worldVertex(face.at(corner + 1));
+                if (!validWorldVertex(b) || !validWorldVertex(c)) {
+                    return failure(QStringLiteral("World coordinates for '%1' are outside the STL safety range.")
+                                       .arg(object.value(QStringLiteral("label")).toString()));
+                }
+
+                const QVector3D area = QVector3D::crossProduct(b - a, c - a);
+                if (!std::isfinite(area.x()) || !std::isfinite(area.y())
+                    || !std::isfinite(area.z())) {
+                    return failure(QStringLiteral("Mesh '%1' generated invalid triangle coordinates.")
+                                       .arg(object.value(QStringLiteral("label")).toString()));
+                }
+                if (area.lengthSquared() < 1.0e-10f)
+                    continue;
+
+                if (triangles.size() >= static_cast<int>(kMaximumStlTriangles)) {
+                    return failure(QStringLiteral("STL export exceeds the 100,000-triangle safety limit."));
+                }
+                triangles.append({area.normalized(), a, b, c});
+            }
+        }
+    }
+
+    if (triangles.isEmpty())
+        return failure(QStringLiteral("No visible editable triangles were available for STL export."));
+
+    // Binary STL has a fixed 84-byte header followed by 50 bytes for every triangle.
+    const qint64 outputBytes = 84LL + static_cast<qint64>(triangles.size()) * 50LL;
+    if (outputBytes > kMaximumStlBytes)
+        return failure(QStringLiteral("STL output exceeds the 128 MiB export safety limit."));
+
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly))
+        return failure(QStringLiteral("Could not open the STL output file: %1").arg(file.errorString()));
+
+    QByteArray header(80, '\0');
+    const QByteArray label("QALYVYRON binary STL");
+    for (int i = 0; i < label.size(); ++i)
+        header[i] = label.at(i);
+
+    QDataStream output(&file);
+    output.setByteOrder(QDataStream::LittleEndian);
+    output.setFloatingPointPrecision(QDataStream::SinglePrecision);
+    if (output.writeRawData(header.constData(), header.size()) != header.size()) {
+        file.cancelWriting();
+        return failure(QStringLiteral("Could not write the STL header."));
+    }
+
+    output << static_cast<quint32>(triangles.size());
+    for (const StlTriangle &triangle : triangles) {
+        // STL stores one normal and three world-space vertices per triangle.
+        output << triangle.normal.x() << triangle.normal.y() << triangle.normal.z()
+               << triangle.a.x() << triangle.a.y() << triangle.a.z()
+               << triangle.b.x() << triangle.b.y() << triangle.b.z()
+               << triangle.c.x() << triangle.c.y() << triangle.c.z()
+               << static_cast<quint16>(0);
+        if (output.status() != QDataStream::Ok) {
+            file.cancelWriting();
+            return failure(QStringLiteral("An I/O error occurred while writing the STL output file."));
+        }
+    }
+
+    if (file.pos() != outputBytes || output.status() != QDataStream::Ok || !file.commit())
+        return failure(QStringLiteral("Could not finish writing the binary STL file."));
+
+    QVariantMap result{
+        {QStringLiteral("ok"), true},
+        {QStringLiteral("path"), QFileInfo(path).absoluteFilePath()},
+        {QStringLiteral("exportedTriangles"), triangles.size()},
+        {QStringLiteral("skippedObjects"), skippedObjects}
+    };
+    if (skippedObjects > 0) {
+        result.insert(QStringLiteral("warning"),
+                      QStringLiteral("%1 hidden or non-editable object(s) were skipped. STL contains visible editable geometry only.")
+                          .arg(skippedObjects));
+    }
+    return result;
+}
+

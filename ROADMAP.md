@@ -46,7 +46,8 @@ This stage is what separates a scene viewer from a practical 3D creation tool.
 ## Stage 3 — Asset interoperability
 
 - [ ] Complete robust OBJ and glTF 2.0 import with materials, textures, hierarchy, transforms, and useful error reporting.
-- [ ] Export edited meshes to tested standard formats, initially glTF 2.0 and OBJ.
+- [x] Import ASCII and binary STL as connected editable triangle meshes; export visible editable meshes as binary STL with transform-baking round-trip tests.
+- [ ] Export edited meshes to additional tested standard formats, including glTF 2.0.
 - [ ] Add asset collection/relocation so a project can be moved to another folder or machine without broken paths.
 - [ ] Validate file size, formats, texture paths, and malformed inputs before allocating large resources.
 - [ ] Test round-trip import/export with reference assets and image comparisons.
