@@ -14,7 +14,7 @@ QALYVYRON is being developed as a local desktop tool for creating, editing, anim
 - Cube, sphere, cylinder, cone, and plane scene objects.
 - Object hierarchy, renaming, duplication, deletion, and direct transform editing. Each object has a hide/show control; hidden objects stay in the scene file but are excluded from the live view, framing, and offline final render.
 - Editable polygon-mesh tools for built-in primitives and imported OBJ geometry: clickable vertex and edge handles, single-edge subdivision with a new editable midpoint vertex, closed edge-loop selection to create supported planar convex faces, create faces from ordered vertex selections, merge vertices, change vertex coordinates, extrude and inset convex planar faces, and delete faces.
-- Material base-color palette and roughness for the built-in primitive objects.
+- Material base color, roughness, and a basic metallic slider for built-in editable meshes. The offline renderer applies metallic shading, but a complete node-based PBR and texture pipeline remains planned.
 - Camera field-of-view and key/fill-light controls.
 - Versioned `.qvscene` project files with local save/open validation, including editable mesh topology. Save remembers the active project path; Save As creates a separate copy, common save/open/undo/redo shortcuts are available, and New/Open/window closing protect unsaved edits with Save, Discard, and Cancel choices. While edits are unsaved, a recovery snapshot is written to app-local storage about every 30 seconds. On next launch, a prompt offers restore or discard; saving or explicitly discarding clears the recovery copy without overwriting the original scene file.
 - Undo and redo history for common scene, transform, material, camera, and light edits.

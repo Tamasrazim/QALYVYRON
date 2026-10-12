@@ -70,6 +70,7 @@ private slots:
     void cancelledRenderDoesNotWritePartialOutput();
     void hiddenObjectsAreNotIncludedInFinalRender();
     void offlineRenderRespectsViewportFocusTarget();
+    void metalnessChangesFinalRenderAppearance();
     void writesPngFromSceneGeometry();
 };
 
@@ -198,6 +199,62 @@ void FinalRendererTests::offlineRenderRespectsViewportFocusTarget()
     }
     QVERIFY2(uniqueColors.size() > 1,
              "The final camera must render the mesh at the saved viewport focus target.");
+    QVERIFY(!renderer.busy());
+}
+
+void FinalRendererTests::metalnessChangesFinalRenderAppearance()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    auto makeMaterialScene = [](double metalness) {
+        QVariantMap scene = smallPlaneScene();
+        QVariantList objects = scene.value(QStringLiteral("objects")).toList();
+        QVariantMap object = objects.first().toMap();
+        object.insert(QStringLiteral("color"), QStringLiteral("#df5b57"));
+        object.insert(QStringLiteral("metalness"), metalness);
+        objects[0] = object;
+        scene.insert(QStringLiteral("objects"), objects);
+        return scene;
+    };
+
+    FinalRenderer renderer;
+    QSignalSpy finished(&renderer, &FinalRenderer::renderFinished);
+    QVERIFY(finished.isValid());
+
+    const QString nonMetalPath = directory.filePath(QStringLiteral("non-metal.png"));
+    QVERIFY(renderer.startRender(QUrl::fromLocalFile(nonMetalPath),
+                                 makeMaterialScene(0.0), 48, 48, 2, 0));
+    QTRY_VERIFY_WITH_TIMEOUT(!finished.isEmpty(), 10000);
+    const QList<QVariant> nonMetalResult = finished.takeFirst();
+    QVERIFY2(nonMetalResult.at(0).toBool(), qPrintable(nonMetalResult.at(1).toString()));
+    const QImage nonMetalImage(nonMetalPath);
+    QVERIFY(!nonMetalImage.isNull());
+
+    const QString metalPath = directory.filePath(QStringLiteral("metal.png"));
+    QVERIFY(renderer.startRender(QUrl::fromLocalFile(metalPath),
+                                 makeMaterialScene(1.0), 48, 48, 2, 0));
+    QTRY_VERIFY_WITH_TIMEOUT(!finished.isEmpty(), 10000);
+    const QList<QVariant> metalResult = finished.takeFirst();
+    QVERIFY2(metalResult.at(0).toBool(), qPrintable(metalResult.at(1).toString()));
+    const QImage metalImage(metalPath);
+    QVERIFY(!metalImage.isNull());
+
+    qint64 totalPixelDifference = 0;
+    for (int y = 0; y < nonMetalImage.height(); ++y) {
+        const auto *nonMetalRow =
+            reinterpret_cast<const QRgb *>(nonMetalImage.constScanLine(y));
+        const auto *metalRow =
+            reinterpret_cast<const QRgb *>(metalImage.constScanLine(y));
+        for (int x = 0; x < nonMetalImage.width(); ++x) {
+            totalPixelDifference += std::abs(qRed(nonMetalRow[x]) - qRed(metalRow[x]));
+            totalPixelDifference += std::abs(qGreen(nonMetalRow[x]) - qGreen(metalRow[x]));
+            totalPixelDifference += std::abs(qBlue(nonMetalRow[x]) - qBlue(metalRow[x]));
+        }
+    }
+
+    QVERIFY2(totalPixelDifference > 1000,
+             "Metalness must visibly affect final rendering, not just the inspector value.");
     QVERIFY(!renderer.busy());
 }
 

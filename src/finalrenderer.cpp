@@ -122,6 +122,7 @@ struct Triangle
     QVector3D centroid;
     Bounds bounds;
     float roughness = 0.38f;
+    float metalness = 0.08f;
 };
 
 struct Hit
@@ -311,6 +312,8 @@ bool appendSceneTriangles(const QVariantMap &scene,
         const QVector3D albedo = colorToLinear(color);
         const float roughness = static_cast<float>(
             std::clamp(numberOr(object, QStringLiteral("roughness"), 0.38), 0.0, 1.0));
+        const float metalness = static_cast<float>(
+            std::clamp(numberOr(object, QStringLiteral("metalness"), 0.08), 0.0, 1.0));
 
         for (const QVariant &rawFace : rawFaces) {
             const QVariantList corners = rawFace.toList();
@@ -353,6 +356,7 @@ bool appendSceneTriangles(const QVariantMap &scene,
 
                 triangle.albedo = albedo;
                 triangle.roughness = roughness;
+                triangle.metalness = metalness;
                 triangle.centroid = (triangle.a + triangle.b + triangle.c) / 3.0f;
                 triangle.bounds.include(triangle.a);
                 triangle.bounds.include(triangle.b);
@@ -538,10 +542,11 @@ QVector3D directLighting(const Ray &ray,
     const Triangle &triangle = scene.triangle(hit.triangleIndex);
     const QVector3D albedo = triangle.albedo;
     const float roughness = triangle.roughness;
+    const float metalness = triangle.metalness;
 
-    // A low non-zero ambient term keeps shadowed faces readable. Direct lights
-    // still determine shape, surface orientation and occlusion.
-    QVector3D radiance = albedo * 0.075f;
+    // Higher metalness removes most diffuse energy and tints the reflection term.
+    // This is a simple real-time-friendly material model, not a full node-based PBR system.
+    QVector3D radiance = albedo * (0.075f * (1.0f - 0.65f * metalness));
 
     auto applyLight = [&](const QVector3D &lightDirection,
                           const QVector3D &lightColor,
@@ -556,7 +561,8 @@ QVector3D directLighting(const Ray &ray,
         if (scene.occluded(shadowRay, shadowDistance))
             return;
 
-        radiance += componentMultiply(albedo, lightColor) * (intensity * diffuse);
+        radiance += componentMultiply(albedo, lightColor)
+            * (intensity * diffuse * (1.0f - metalness));
 
         const QVector3D viewDirection = -ray.direction;
         const QVector3D halfDirection = (lightDirection + viewDirection).normalized();
@@ -564,7 +570,12 @@ QVector3D directLighting(const Ray &ray,
         const float specular = std::pow(std::max(0.0f,
             QVector3D::dotProduct(hit.normal, halfDirection)), specularPower)
             * (1.0f - roughness) * intensity * 0.12f;
-        radiance += componentMultiply(QVector3D(specular, specular, specular), lightColor);
+        const QVector3D neutralReflection(1.0f, 1.0f, 1.0f);
+        const QVector3D reflectionTint =
+            neutralReflection * (1.0f - metalness) + albedo * metalness;
+        radiance += componentMultiply(
+            componentMultiply(QVector3D(specular, specular, specular), reflectionTint),
+            lightColor);
     };
 
     applyLight(directionalLight, QVector3D(1, 1, 1),

@@ -597,6 +597,7 @@ ApplicationWindow {
             rzField.text = "0"
             scaleField.text = "1"
             roughnessSlider.value = 0.38
+            metalnessSlider.value = 0.08
             colorCombo.currentIndex = 0
             return
         }
@@ -612,6 +613,7 @@ ApplicationWindow {
         rzField.text = Number(r.z).toFixed(1)
         scaleField.text = Number(selectedObject.uniformScale).toFixed(2)
         roughnessSlider.value = selectedObject.editorRoughness
+        metalnessSlider.value = selectedObject.editorMetalness
 
         const palette = ["#c8c8c8", "#f2f2f2", "#555555", "#df5b57", "#508bdc", "#d8ae57"]
         let nearest = 0
@@ -645,6 +647,9 @@ ApplicationWindow {
         const defaultColor = defaultColors[objectList.count % defaultColors.length]
         const colorValue = saved.color ? String(saved.color) : defaultColor
         const roughness = saved.roughness !== undefined ? Math.max(0, Math.min(1, Number(saved.roughness))) : 0.38
+        const storedMetalness = Number(saved.metalness)
+        const metalness = saved.metalness !== undefined && Number.isFinite(storedMetalness)
+            ? Math.max(0, Math.min(1, storedMetalness)) : 0.08
         // Older scene files have no visibility field, so their objects stay visible.
         const objectIsVisible = saved.visible === undefined ? true : Boolean(saved.visible)
 
@@ -654,6 +659,7 @@ ApplicationWindow {
             editorShape: shape,
             editorColor: colorValue,
             editorRoughness: roughness,
+            editorMetalness: metalness,
             editorVisible: objectIsVisible,
             editorMeshData: saved.mesh || ({}),
             uniformScale: uniformScale,
@@ -680,6 +686,7 @@ ApplicationWindow {
             scale: uniformScale,
             color: colorValue,
             roughness: roughness,
+            metalness: metalness,
             isVisible: objectIsVisible
         })
         selectObject(objectId)
@@ -748,6 +755,7 @@ ApplicationWindow {
             editorImported: true,
             editorColor: "#c8c8c8",
             editorRoughness: 0.38,
+            editorMetalness: 0.0,
             editorVisible: objectIsVisible,
             uniformScale: uniformScale,
             assetUrl: sourceText,
@@ -774,6 +782,7 @@ ApplicationWindow {
             scale: uniformScale,
             color: "#c8c8c8",
             roughness: 0.38,
+            metalness: 0.0,
             isVisible: objectIsVisible
         })
         selectObject(objectId)
@@ -1187,6 +1196,16 @@ ApplicationWindow {
         objectList.setProperty(selectedIndex, "roughness", roughness)
     }
 
+    function setMaterialMetalness(value) {
+        if (!selectedObject || selectedIndex < 0 || selectedObject.editorImported)
+            return
+
+        // Metallic response changes how the final renderer mixes diffuse color and reflections.
+        const metalness = Math.max(0, Math.min(1, value))
+        selectedObject.editorMetalness = metalness
+        objectList.setProperty(selectedIndex, "metalness", metalness)
+    }
+
     function duplicateSelected() {
         if (!selectedObject || selectedIndex < 0)
             return
@@ -1203,7 +1222,8 @@ ApplicationWindow {
             rz: row.rz,
             scale: row.scale,
             color: row.color,
-            roughness: row.roughness
+            roughness: row.roughness,
+            metalness: row.metalness
         }
         if (row.kind === "asset") {
             addImportedAsset(row.source, copy)
@@ -1294,12 +1314,12 @@ ApplicationWindow {
                 kind: row.kind || "primitive",
                 source: row.source || "",
                 mesh: row.kind === "asset" ? null : meshDataForObject(row.objectId),
-                visible: row.isVisible !== false,
                 x: row.x, y: row.y, z: row.z,
                 rx: row.rx, ry: row.ry, rz: row.rz,
                 scale: row.scale,
                 color: row.color,
                 roughness: row.roughness,
+                metalness: row.metalness,
                 visible: row.isVisible !== false
             })
         }
@@ -1424,6 +1444,7 @@ ApplicationWindow {
             visible: editorVisible
             property color editorColor: "#c8c8c8"
             property real editorRoughness: 0.38
+            property real editorMetalness: 0.0
             property real uniformScale: 1.0
             property url assetUrl: ""
 
@@ -1450,6 +1471,7 @@ ApplicationWindow {
             property string editorShape: "Cube"
             property color editorColor: "#c8c8c8"
             property real editorRoughness: 0.38
+            property real editorMetalness: 0.0
             property real uniformScale: 1.0
             property bool editorVisible: true
             visible: editorVisible
@@ -1473,7 +1495,7 @@ ApplicationWindow {
                 PrincipledMaterial {
                     baseColor: editableModel.editorColor
                     roughness: editableModel.editorRoughness
-                    metalness: 0.08
+                    metalness: editableModel.editorMetalness
                 }
             ]
 
@@ -3748,6 +3770,44 @@ ApplicationWindow {
                         visible: !root.beginnerMode
                         Layout.fillWidth: true
                         text: "Lower roughness creates a smoother surface. Higher roughness diffuses reflections."
+                        color: "#6f6f6f"
+                        font.pixelSize: 10
+                        wrapMode: Text.WordWrap
+                    }
+
+                    RowLayout {
+                        visible: !root.beginnerMode
+                        Layout.fillWidth: true
+                        Text {
+                            text: "Metalness"
+                            color: root.secondaryText
+                            font.pixelSize: 10
+                        }
+                        Item { Layout.fillWidth: true }
+                        Text {
+                            text: root.selectedObject
+                                  ? Number(root.selectedObject.editorMetalness).toFixed(2) : "0.08"
+                            color: "#cecece"
+                            font.pixelSize: 10
+                        }
+                    }
+
+                    Slider {
+                        id: metalnessSlider
+                        visible: !root.beginnerMode
+                        Layout.fillWidth: true
+                        enabled: root.selectedObject !== null && !root.selectedObject.editorImported
+                        from: 0
+                        to: 1
+                        value: 0.08
+                        onPressedChanged: if (pressed) root.pushUndoSnapshot()
+                        onMoved: root.setMaterialMetalness(value)
+                    }
+
+                    Text {
+                        visible: !root.beginnerMode
+                        Layout.fillWidth: true
+                        text: "Low values behave like non-metals; high values tint the surface reflections with the material color."
                         color: "#6f6f6f"
                         font.pixelSize: 10
                         wrapMode: Text.WordWrap
