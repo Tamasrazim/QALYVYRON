@@ -16,7 +16,7 @@ QALYVYRON is being developed as a local desktop tool for creating, editing, anim
 - Editable polygon-mesh tools for built-in primitives and imported OBJ geometry: create faces from ordered viewport vertex selections, merge vertices, change vertex coordinates, extrude and inset convex planar faces, and delete faces.
 - Material base-color palette and roughness for the built-in primitive objects.
 - Camera field-of-view and key/fill-light controls.
-- Versioned `.qvscene` project files with local save/open validation, including the editable mesh topology.
+- Versioned `.qvscene` project files with local save/open validation, including the editable mesh topology. Save remembers the active project path; Save As creates a separate copy, and common save/open/undo/redo shortcuts are available.
 - Undo and redo history for common scene, transform, material, camera, and light edits.
 - **Wavefront OBJ (`.obj`) import:** vertex positions and polygon faces are parsed into QALYVYRON's editable mesh data. OBJ meshes are embedded in `.qvscene` projects and can be edited with indexed vertex coordinates and face extrusion.
 - **Wavefront OBJ export:** writes editable mesh objects with their scene transforms baked into exported vertex positions. Runtime-loaded `.glb`/`.gltf` assets are skipped with a clear warning.

@@ -60,7 +60,11 @@ Use the **Undo** and **Redo** buttons in the toolbar. The current implementation
 ## Final render, save, reopen, and export
 
 - **Render Image:** opens offline-render settings. Choose 720p, 1080p, 1440p, 4K, or 8K, select samples per pixel and diffuse-bounce depth, then choose a local PNG destination. Rendering runs on a worker thread with progress reporting and cancellation. The renderer uses actual scene geometry, directional/point lights, hard shadows, material colors/roughness, and diffuse indirect bounces. Resolution/sample/bounce combinations are capped to keep the render workload bounded.
-- **Save:** writes a validated `.qvscene` project, including embedded editable OBJ geometry and mesh edits.
+- **Save:** the first save asks where to store the scene. Later saves update that same project file.
+- **Save As…:** choose a new file or make a separate copy.
+- **Ctrl+S:** save the current project; opens the save dialog if the scene has not been saved before.
+- **Ctrl+O:** open a scene; **Ctrl+Z** and **Ctrl+Y** undo and redo supported edits.
+- Saving writes a validated `.qvscene` project, including embedded editable OBJ geometry and mesh edits.
 - **Open:** reads a supported QALYVYRON scene file.
 - **Export OBJ:** writes editable mesh objects to a Wavefront OBJ file and bakes object position, rotation, and scale into the output vertices. Read-only glTF runtime-loaded objects are skipped with a warning.
 - **Export Preview:** writes a PNG of the live viewport.

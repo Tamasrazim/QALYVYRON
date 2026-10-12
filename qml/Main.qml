@@ -49,9 +49,32 @@ ApplicationWindow {
     property int requestedRenderBounces: 1
     property real renderProgressValue: 0
     property string renderStatusText: "Ready"
+    property url currentProjectUrl: ""
 
     ListModel {
         id: objectList
+    }
+
+    Shortcut {
+        sequence: StandardKey.Save
+        onActivated: root.saveCurrentProject()
+    }
+
+    Shortcut {
+        sequence: StandardKey.Open
+        onActivated: openSceneDialog.open()
+    }
+
+    Shortcut {
+        sequence: StandardKey.Undo
+        enabled: root.undoStack.length > 0
+        onActivated: root.undo()
+    }
+
+    Shortcut {
+        sequence: StandardKey.Redo
+        enabled: root.redoStack.length > 0
+        onActivated: root.redo()
     }
 
     Connections {
@@ -98,6 +121,25 @@ ApplicationWindow {
     function clearHistory() {
         undoStack = []
         redoStack = []
+    }
+
+    function saveSceneTo(url) {
+        const result = projectIO.saveProject(url, root.serializeScene())
+        if (result.ok) {
+            currentProjectUrl = url
+            root.setStatus("Scene saved: " + result.path)
+            return true
+        }
+
+        root.setStatus("Save failed: " + result.error)
+        return false
+    }
+
+    function saveCurrentProject() {
+        if (String(currentProjectUrl).length > 0)
+            saveSceneTo(currentProjectUrl)
+        else
+            saveSceneDialog.open()
     }
 
     function undo() {
@@ -751,6 +793,7 @@ ApplicationWindow {
         if (editorReady)
             pushUndoSnapshot()
 
+        currentProjectUrl = ""
         clearScene()
         addPrimitive("Cube", {id: "object-1", label: "Cube", x: 0, y: 0, z: 0, scale: 1, color: "#c8c8c8"})
         orbitYaw = 34
@@ -1472,11 +1515,7 @@ ApplicationWindow {
         defaultSuffix: "qvscene"
 
         onAccepted: {
-            const result = projectIO.saveProject(selectedFile, root.serializeScene())
-            if (result.ok)
-                root.setStatus("Scene saved: " + result.path)
-            else
-                root.setStatus("Save failed: " + result.error)
+            root.saveSceneTo(selectedFile)
         }
     }
 
@@ -1489,6 +1528,7 @@ ApplicationWindow {
         onAccepted: {
             const result = projectIO.loadProject(selectedFile)
             if (result.ok) {
+                root.currentProjectUrl = selectedFile
                 root.clearHistory()
                 root.applyProject(result.data)
             } else {
@@ -1797,6 +1837,10 @@ ApplicationWindow {
                 }
                 Button {
                     text: "Save"
+                    onClicked: root.saveCurrentProject()
+                }
+                Button {
+                    text: "Save As…"
                     onClicked: saveSceneDialog.open()
                 }
                 Button {
