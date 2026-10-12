@@ -1,3 +1,5 @@
+// What this does: Checks that final renders produce the expected output and that the renderer handles invalid or oversized jobs safely.
+
 #include "finalrenderer.h"
 
 #include <QFileInfo>

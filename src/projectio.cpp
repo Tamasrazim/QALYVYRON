@@ -1,3 +1,5 @@
+// What this does: Reads and writes QALYVYRON scene files and OBJ geometry, checking file contents and sizes before accepting them.
+
 #include "projectio.h"
 
 #include <QFile>

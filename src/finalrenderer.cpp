@@ -1,3 +1,5 @@
+// What this does: Turns a scene into a finished image, including geometry, lighting, materials, color handling, and limits that protect against an unreasonable render request.
+
 #include "finalrenderer.h"
 
 #include <QBuffer>

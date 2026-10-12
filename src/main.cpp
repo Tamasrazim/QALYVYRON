@@ -1,3 +1,5 @@
+// What this does: Starts the Qt application and connects the C++ types that the QML interface needs.
+
 #include "projectio.h"
 #include "finalrenderer.h"
 

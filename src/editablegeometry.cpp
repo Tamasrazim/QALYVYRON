@@ -1,3 +1,5 @@
+// What this does: Implements the scene-editing operations: it changes geometry and keeps the data used by the editor in step.
+
 #include "editablegeometry.h"
 
 #include <QByteArray>

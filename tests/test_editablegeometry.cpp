@@ -1,3 +1,5 @@
+// What this does: Checks that the geometry-editing functions change scene objects as expected and handle invalid input safely.
+
 #include "editablegeometry.h"
 
 #include <QtTest>
