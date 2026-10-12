@@ -1,3 +1,5 @@
+# Tells CMake how to build the Qt application, connect its source files, and build the tests.
+
 cmake_minimum_required(VERSION 3.21)
 
 project(QALYVYRON

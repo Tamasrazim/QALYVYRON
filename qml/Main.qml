@@ -1,3 +1,5 @@
+// What this does: Builds the app window and the controls a person uses to work with scenes, edit geometry, and start a render.
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts

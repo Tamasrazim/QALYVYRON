@@ -1,3 +1,5 @@
+# Builds QALYVYRON and runs its automated checks so broken code is caught before a release.
+
 name: Build and test
 
 on:

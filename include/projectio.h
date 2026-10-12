@@ -1,3 +1,5 @@
+// What this does: Declares the functions for opening and saving QALYVYRON scenes and exchanging geometry with OBJ files.
+
 #pragma once
 
 #include <QObject>

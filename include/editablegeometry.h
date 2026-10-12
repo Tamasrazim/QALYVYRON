@@ -1,3 +1,5 @@
+// What this does: Declares the operations the editor uses to create, select, and change scene geometry.
+
 #pragma once
 
 #include <QQuick3DGeometry>

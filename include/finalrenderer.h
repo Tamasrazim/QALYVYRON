@@ -1,3 +1,5 @@
+// What this does: Defines the interface for turning a scene into a finished rendered image, including the settings and result passed to the renderer.
+
 #pragma once
 
 #include <QObject>
