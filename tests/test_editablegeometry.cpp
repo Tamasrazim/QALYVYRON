@@ -1,6 +1,7 @@
 #include "editablegeometry.h"
 
 #include <QtTest>
+#include <QSet>
 
 #include <limits>
 
@@ -10,6 +11,8 @@ class EditableGeometryTests final : public QObject
 
 private slots:
     void cubeHasEditableTopology();
+    void edgeIndexExposesUniqueEdgesAndCenters();
+    void edgeIndexTracksTopologyChanges();
     void primitiveShapesHaveExpectedTopology();
     void vertexEditsChangeSerializedMesh();
     void extrudingFaceAddsCapAndSides();
@@ -32,6 +35,49 @@ void EditableGeometryTests::cubeHasEditableTopology()
     QCOMPARE(geometry.vertexCount(), 8);
     QCOMPARE(geometry.faceCount(), 6);
     QVERIFY(geometry.faceNormal(0).length() > 0.9f);
+}
+
+void EditableGeometryTests::edgeIndexExposesUniqueEdgesAndCenters()
+{
+    EditableGeometry geometry;
+    QCOMPARE(geometry.edgeCount(), 12);
+
+    QSet<quint64> seen;
+    for (int index = 0; index < geometry.edgeCount(); ++index) {
+        const QVariantList endpoints = geometry.edgeVertexIndices(index);
+        QCOMPARE(endpoints.size(), 2);
+        const int a = endpoints.at(0).toInt();
+        const int b = endpoints.at(1).toInt();
+        QVERIFY(a >= 0 && a < geometry.vertexCount());
+        QVERIFY(b >= 0 && b < geometry.vertexCount());
+        QVERIFY(a < b);
+
+        const quint64 key = (static_cast<quint64>(static_cast<quint32>(a)) << 32)
+            | static_cast<quint32>(b);
+        QVERIFY(!seen.contains(key));
+        seen.insert(key);
+
+        const QVector3D expected =
+            (geometry.vertexPosition(a) + geometry.vertexPosition(b)) * 0.5f;
+        QCOMPARE(geometry.edgeCenter(index), expected);
+    }
+
+    QCOMPARE(seen.size(), 12);
+    QVERIFY(geometry.edgeVertexIndices(-1).isEmpty());
+    QVERIFY(geometry.edgeVertexIndices(geometry.edgeCount()).isEmpty());
+    QCOMPARE(geometry.edgeCenter(-1), QVector3D());
+}
+
+void EditableGeometryTests::edgeIndexTracksTopologyChanges()
+{
+    EditableGeometry geometry;
+    QCOMPARE(geometry.edgeCount(), 12);
+
+    QVERIFY(geometry.extrudeFace(0, 10.0));
+    QCOMPARE(geometry.edgeCount(), 20);
+
+    geometry.setShape(QStringLiteral("Plane"));
+    QCOMPARE(geometry.edgeCount(), 4);
 }
 
 void EditableGeometryTests::primitiveShapesHaveExpectedTopology()

@@ -55,6 +55,8 @@ ApplicationWindow {
     property int tutorialStep: 0
     property var meshVertexSelection: []
     property bool vertexSelectionMode: false
+    property var meshEdgeSelection: []
+    property bool edgeSelectionMode: false
     property int requestedRenderWidth: 1920
     property int requestedRenderHeight: 1080
     property int requestedRenderSamples: 8
@@ -390,7 +392,9 @@ ApplicationWindow {
 
     function selectObject(objectId) {
         clearMeshVertexSelection()
+        clearMeshEdgeSelection()
         vertexSelectionMode = false
+        edgeSelectionMode = false
         selectedIndex = -1
         selectedObject = null
 
@@ -629,6 +633,10 @@ ApplicationWindow {
     function selectMeshVertex(index) {
         if (!selectedEditableGeometry())
             return
+        if (edgeSelectionMode) {
+            setStatus("Close edge-selection mode before selecting vertices.")
+            return
+        }
         if (vertexSelectionMode) {
             toggleMeshVertexSelection(index)
             return
@@ -636,6 +644,133 @@ ApplicationWindow {
         vertexIndexSpinner.value = Math.max(0, Math.min(selectedObject.geometry.vertexCount - 1, index))
         refreshMeshEditFields()
         setStatus("Selected vertex " + vertexIndexSpinner.value + ".")
+    }
+
+    function clearMeshEdgeSelection() {
+        meshEdgeSelection = []
+    }
+
+    function toggleMeshEdgeSelection(index) {
+        const geometry = selectedEditableGeometry()
+        if (!geometry || index < 0 || index >= geometry.edgeCount)
+            return
+
+        const selection = meshEdgeSelection.slice()
+        const existingIndex = selection.indexOf(index)
+        if (existingIndex >= 0)
+            selection.splice(existingIndex, 1)
+        else
+            selection.push(index)
+
+        meshEdgeSelection = selection
+        edgeIndexSpinner.value = index
+        refreshMeshEditFields()
+        setStatus(selection.length + " edge(s) selected. Select a closed loop to create a face.")
+    }
+
+    function selectMeshEdge(index) {
+        const geometry = selectedEditableGeometry()
+        if (!geometry)
+            return
+        if (vertexSelectionMode) {
+            setStatus("Close vertex-selection mode before selecting edges.")
+            return
+        }
+        if (edgeSelectionMode) {
+            toggleMeshEdgeSelection(index)
+            return
+        }
+
+        edgeIndexSpinner.value = Math.max(0, Math.min(geometry.edgeCount - 1, index))
+        refreshMeshEditFields()
+        setStatus("Selected edge " + edgeIndexSpinner.value + ".")
+    }
+
+    function createFaceFromSelectedEdges() {
+        const geometry = selectedEditableGeometry()
+        if (!geometry || meshEdgeSelection.length < 3) {
+            setStatus("Select at least three edges that form one closed loop.")
+            return
+        }
+
+        const adjacency = ({})
+        for (const edgeIndex of meshEdgeSelection) {
+            const endpoints = geometry.edgeVertexIndices(edgeIndex)
+            if (!endpoints || endpoints.length !== 2) {
+                setStatus("Edge selection became invalid after a topology change. Select the edges again.")
+                return
+            }
+
+            const a = Number(endpoints[0])
+            const b = Number(endpoints[1])
+            if (!adjacency[a])
+                adjacency[a] = []
+            if (!adjacency[b])
+                adjacency[b] = []
+            adjacency[a].push(b)
+            adjacency[b].push(a)
+        }
+
+        const vertexKeys = Object.keys(adjacency)
+        for (const key of vertexKeys) {
+            if (adjacency[key].length !== 2) {
+                setStatus("Face creation needs one unbranched closed edge loop.")
+                return
+            }
+        }
+
+        const firstEndpoints = geometry.edgeVertexIndices(meshEdgeSelection[0])
+        const start = Number(firstEndpoints[0])
+        let previous = -1
+        let current = start
+        const orderedVertices = []
+
+        while (true) {
+            if (orderedVertices.indexOf(current) >= 0) {
+                if (current !== start) {
+                    setStatus("Selected edges do not form a simple closed loop.")
+                    return
+                }
+                break
+            }
+
+            orderedVertices.push(current)
+            const neighbors = adjacency[current]
+            if (!neighbors || neighbors.length !== 2) {
+                setStatus("Selected edges do not form a closed loop.")
+                return
+            }
+
+            const next = neighbors[0] === previous ? neighbors[1] : neighbors[0]
+            previous = current
+            current = next
+
+            if (current === start)
+                break
+            if (orderedVertices.length > meshEdgeSelection.length) {
+                setStatus("Selected edges do not form a closed loop.")
+                return
+            }
+        }
+
+        if (current !== start || orderedVertices.length !== meshEdgeSelection.length) {
+            setStatus("Select the edges of one connected loop only.")
+            return
+        }
+
+        pushUndoSnapshot()
+        if (!geometry.createFace(orderedVertices)) {
+            setStatus("Face creation was rejected. The loop must be planar, convex, and non-degenerate.")
+            return
+        }
+
+        faceIndexSpinner.value = geometry.faceCount - 1
+        clearMeshVertexSelection()
+        clearMeshEdgeSelection()
+        vertexSelectionMode = false
+        edgeSelectionMode = false
+        refreshMeshEditFields()
+        setStatus("Created a face from the selected edge loop.")
     }
 
     function createFaceFromSelectedVertices() {
@@ -653,7 +788,9 @@ ApplicationWindow {
 
         faceIndexSpinner.value = geometry.faceCount - 1
         clearMeshVertexSelection()
+        clearMeshEdgeSelection()
         vertexSelectionMode = false
+        edgeSelectionMode = false
         refreshMeshEditFields()
         setStatus("Created a polygon face from the selected vertices.")
     }
@@ -688,6 +825,17 @@ ApplicationWindow {
         } else {
             faceInfoLabel.text = "No face selected."
         }
+
+        meshEdgeCountLabel.text = String(geometry.edgeCount) + " edges"
+        const edge = geometry.edgeVertexIndices(edgeIndexSpinner.value)
+        if (edge && edge.length === 2) {
+            const center = geometry.edgeCenter(edgeIndexSpinner.value)
+            edgeInfoLabel.text = "Vertices " + edge[0] + " — " + edge[1]
+                + " | Center " + center.x.toFixed(2) + ", "
+                + center.y.toFixed(2) + ", " + center.z.toFixed(2)
+        } else {
+            edgeInfoLabel.text = "No edge selected."
+        }
     }
 
     function openMeshEditor() {
@@ -698,6 +846,7 @@ ApplicationWindow {
         }
         vertexIndexSpinner.value = Math.min(vertexIndexSpinner.value, geometry.vertexCount - 1)
         faceIndexSpinner.value = Math.min(faceIndexSpinner.value, geometry.faceCount - 1)
+        edgeIndexSpinner.value = Math.min(edgeIndexSpinner.value, geometry.edgeCount - 1)
         refreshMeshEditFields()
         meshEditDialog.open()
     }
@@ -745,6 +894,9 @@ ApplicationWindow {
             return
         }
 
+        clearMeshEdgeSelection()
+        edgeSelectionMode = false
+        edgeIndexSpinner.value = Math.min(edgeIndexSpinner.value, geometry.edgeCount - 1)
         refreshMeshEditFields()
         setStatus("Extruded face and updated mesh topology.")
     }
@@ -763,6 +915,9 @@ ApplicationWindow {
             return
         }
 
+        clearMeshEdgeSelection()
+        edgeSelectionMode = false
+        edgeIndexSpinner.value = Math.min(edgeIndexSpinner.value, geometry.edgeCount - 1)
         refreshMeshEditFields()
         setStatus("Inset face and updated mesh topology.")
     }
@@ -787,7 +942,10 @@ ApplicationWindow {
         vertexIndexSpinner.value = Math.min(vertexIndexSpinner.value, geometry.vertexCount - 1)
         mergeTargetSpinner.value = Math.min(mergeTargetSpinner.value, geometry.vertexCount - 1)
         clearMeshVertexSelection()
+        clearMeshEdgeSelection()
         vertexSelectionMode = false
+        edgeSelectionMode = false
+        edgeIndexSpinner.value = Math.min(edgeIndexSpinner.value, geometry.edgeCount - 1)
         refreshMeshEditFields()
         setStatus("Deleted face and compacted unused mesh vertices.")
     }
@@ -814,7 +972,10 @@ ApplicationWindow {
         faceIndexSpinner.value = Math.min(faceIndexSpinner.value, geometry.faceCount - 1)
         mergeTargetSpinner.value = Math.min(vertexIndexSpinner.value, geometry.vertexCount - 1)
         clearMeshVertexSelection()
+        clearMeshEdgeSelection()
         vertexSelectionMode = false
+        edgeSelectionMode = false
+        edgeIndexSpinner.value = Math.min(edgeIndexSpinner.value, geometry.edgeCount - 1)
         refreshMeshEditFields()
         setStatus("Merged vertex " + sourceIndex + " into vertex " + targetIndex + ".")
     }
@@ -1254,6 +1415,12 @@ ApplicationWindow {
                     }
                     Item { Layout.fillWidth: true }
                     Text {
+                        id: meshEdgeCountLabel
+                        text: "0 edges"
+                        color: root.secondaryText
+                        font.pixelSize: 11
+                    }
+                    Text {
                         id: meshFaceCountLabel
                         text: "0 faces"
                         color: root.secondaryText
@@ -1296,9 +1463,14 @@ ApplicationWindow {
                         text: root.vertexSelectionMode ? "Vertex Selection: ON" : "Select Face Vertices"
                         highlighted: root.vertexSelectionMode
                         onClicked: {
-                            root.vertexSelectionMode = !root.vertexSelectionMode
-                            if (!root.vertexSelectionMode)
+                            const enabling = !root.vertexSelectionMode
+                            root.vertexSelectionMode = enabling
+                            if (enabling) {
+                                root.edgeSelectionMode = false
+                                root.clearMeshEdgeSelection()
+                            } else {
                                 root.clearMeshVertexSelection()
+                            }
                             root.setStatus(root.vertexSelectionMode
                                            ? "Click vertex markers in boundary order, then create a face."
                                            : "Vertex multi-selection mode closed.")
@@ -1326,6 +1498,87 @@ ApplicationWindow {
                                  && root.meshVertexSelection.length >= 3
                         onClicked: root.createFaceFromSelectedVertices()
                     }
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 1
+                    color: root.borderColor
+                }
+
+                Text {
+                    text: "EDGE SELECTION"
+                    color: "#bcbcbc"
+                    font.pixelSize: 10
+                    font.bold: true
+                    font.letterSpacing: 1.2
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Button {
+                        Layout.fillWidth: true
+                        text: root.edgeSelectionMode ? "Edge Selection: ON" : "Select Edge Loop"
+                        highlighted: root.edgeSelectionMode
+                        onClicked: {
+                            const enabling = !root.edgeSelectionMode
+                            root.edgeSelectionMode = enabling
+                            if (enabling) {
+                                root.vertexSelectionMode = false
+                                root.clearMeshVertexSelection()
+                            } else {
+                                root.clearMeshEdgeSelection()
+                            }
+                            root.setStatus(enabling
+                                ? "Click edge lines to select one closed loop. Then create a face."
+                                : "Edge multi-selection mode closed.")
+                        }
+                    }
+                    Button {
+                        text: "Clear"
+                        enabled: root.meshEdgeSelection.length > 0
+                        onClicked: root.clearMeshEdgeSelection()
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Text {
+                        Layout.fillWidth: true
+                        text: root.meshEdgeSelection.length + " edges selected"
+                        color: root.secondaryText
+                        font.pixelSize: 10
+                    }
+                    Button {
+                        text: "Create Face from Loop"
+                        enabled: root.selectedObject !== null
+                                 && !root.selectedObject.editorImported
+                                 && root.meshEdgeSelection.length >= 3
+                        onClicked: root.createFaceFromSelectedEdges()
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Text { text: "Edge index"; color: root.secondaryText; font.pixelSize: 11 }
+                    SpinBox {
+                        id: edgeIndexSpinner
+                        from: 0
+                        to: Math.max(0, root.selectedObject && !root.selectedObject.editorImported
+                                      ? root.selectedObject.geometry.edgeCount - 1 : 0)
+                        editable: true
+                        onValueChanged: if (meshEditDialog.visible) root.refreshMeshEditFields()
+                    }
+                    Item { Layout.fillWidth: true }
+                }
+
+                Text {
+                    id: edgeInfoLabel
+                    Layout.fillWidth: true
+                    text: "Select an edge to inspect its endpoints and midpoint."
+                    color: root.secondaryText
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
                 }
 
                 GridLayout {
@@ -2595,6 +2848,76 @@ ApplicationWindow {
                                     acceptedButtons: Qt.LeftButton
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: root.selectMeshVertex(index)
+                                }
+                            }
+                        }
+
+                        Repeater {
+                            id: meshEdgeHandles
+                            model: meshEditDialog.visible && root.selectedEditableGeometry()
+                                   ? root.selectedEditableGeometry().edgeCount : 0
+
+                            delegate: Item {
+                                required property int index
+                                readonly property var edgePair: {
+                                    const geometry = root.selectedEditableGeometry()
+                                    if (!geometry)
+                                        return []
+                                    const revision = geometry.edgeCount
+                                    return geometry.edgeVertexIndices(index)
+                                }
+                                readonly property var projectedA: {
+                                    const geometry = root.selectedEditableGeometry()
+                                    if (!geometry || !root.selectedObject || edgePair.length !== 2)
+                                        return Qt.vector3d(-1000, -1000, -1)
+                                    const revision = geometry.edgeCount
+                                    const local = geometry.vertexPosition(Number(edgePair[0]))
+                                    return view3d.mapFrom3DScene(root.selectedObject.mapPositionToScene(local))
+                                }
+                                readonly property var projectedB: {
+                                    const geometry = root.selectedEditableGeometry()
+                                    if (!geometry || !root.selectedObject || edgePair.length !== 2)
+                                        return Qt.vector3d(-1000, -1000, -1)
+                                    const revision = geometry.edgeCount
+                                    const local = geometry.vertexPosition(Number(edgePair[1]))
+                                    return view3d.mapFrom3DScene(root.selectedObject.mapPositionToScene(local))
+                                }
+                                readonly property real dx: projectedB.x - projectedA.x
+                                readonly property real dy: projectedB.y - projectedA.y
+                                readonly property real edgeLength: Math.sqrt(dx * dx + dy * dy)
+                                readonly property bool isEdgeSelected: root.meshEdgeSelection.indexOf(index) >= 0
+                                                                              || index === edgeIndexSpinner.value
+                                x: (projectedA.x + projectedB.x) / 2 - width / 2
+                                y: (projectedA.y + projectedB.y) / 2 - height / 2
+                                width: Math.max(12, edgeLength)
+                                height: 14
+                                rotation: Math.atan2(dy, dx) * 180 / Math.PI
+                                transformOrigin: Item.Center
+                                z: 28
+                                visible: meshEditDialog.visible
+                                         && root.selectedObject !== null
+                                         && !root.selectedObject.editorImported
+                                         && edgePair.length === 2
+                                         && projectedA.z >= 0 && projectedB.z >= 0
+                                         && projectedA.x >= 0 && projectedA.x <= view3d.width
+                                         && projectedA.y >= 0 && projectedA.y <= view3d.height
+                                         && projectedB.x >= 0 && projectedB.x <= view3d.width
+                                         && projectedB.y >= 0 && projectedB.y <= view3d.height
+
+                                Rectangle {
+                                    anchors.centerIn: parent
+                                    width: parent.width
+                                    height: parent.isEdgeSelected ? 4 : 2
+                                    radius: 1
+                                    color: parent.isEdgeSelected ? "#f5f5f5" : "#666666"
+                                    opacity: parent.isEdgeSelected ? 0.95 : 0.72
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    acceptedButtons: Qt.LeftButton
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.selectMeshEdge(index)
                                 }
                             }
                         }

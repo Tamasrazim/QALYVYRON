@@ -66,6 +66,29 @@ int EditableGeometry::faceCount() const
     return m_faces.size();
 }
 
+int EditableGeometry::edgeCount() const
+{
+    return m_edges.size();
+}
+
+QVariantList EditableGeometry::edgeVertexIndices(int index) const
+{
+    if (index < 0 || index >= m_edges.size())
+        return {};
+
+    const QPair<int, int> edge = m_edges.at(index);
+    return {edge.first, edge.second};
+}
+
+QVector3D EditableGeometry::edgeCenter(int index) const
+{
+    if (index < 0 || index >= m_edges.size())
+        return {};
+
+    const QPair<int, int> edge = m_edges.at(index);
+    return (m_vertices.at(edge.first) + m_vertices.at(edge.second)) * 0.5f;
+}
+
 QVector3D EditableGeometry::vertexPosition(int index) const
 {
     if (index < 0 || index >= m_vertices.size())
@@ -899,8 +922,42 @@ void EditableGeometry::orientClosedMeshOutward()
     }
 }
 
+void EditableGeometry::rebuildEdgeIndex()
+{
+    m_edges.clear();
+    QSet<quint64> seen;
+
+    // Walk face boundaries in index order and canonicalize endpoint pairs.
+    // Shared edges deduplicate even when adjacent faces traverse them oppositely.
+    for (const QVector<int> &face : m_faces) {
+        if (face.size() < 2)
+            continue;
+
+        for (int i = 0; i < face.size(); ++i) {
+            const int first = face.at(i);
+            const int second = face.at((i + 1) % face.size());
+            if (first < 0 || second < 0 || first >= m_vertices.size()
+                || second >= m_vertices.size() || first == second) {
+                continue;
+            }
+
+            const int a = std::min(first, second);
+            const int b = std::max(first, second);
+            const quint64 key = (static_cast<quint64>(static_cast<quint32>(a)) << 32)
+                | static_cast<quint32>(b);
+            if (seen.contains(key))
+                continue;
+
+            seen.insert(key);
+            m_edges.append(qMakePair(a, b));
+        }
+    }
+}
+
 void EditableGeometry::rebuildGeometry()
 {
+    rebuildEdgeIndex();
+
     QByteArray vertexBuffer;
     int renderedVertexCount = 0;
     for (const QVector<int> &face : m_faces) {

@@ -29,6 +29,7 @@ This stage is what separates a scene viewer from a practical 3D creation tool.
 - [ ] Implement a persistent mesh data model with vertices, edges, faces, normals, and topology validation.
 - [ ] Add object mode and mesh-edit mode with visible vertex, edge, and face selection.
 - [x] Implement an initial vertex-coordinate editor, face extrusion, and convex planar face inset for supported mesh topology.
+- [x] Add a derived unique-edge index, clickable viewport edge handles, and closed edge-loop selection to create supported planar convex faces.
 - [ ] Implement interactive vertex/edge/face selection, edge operations, bevel, merge, delete, face creation, and non-destructive mesh operations.
 - [x] Add selected-object focus and approximate scene-wide framing, with the view target saved and restored in project files.
 - [ ] Add snapping, pivot modes, axis-constrained transform gizmos, numeric operations, and reliable selection.

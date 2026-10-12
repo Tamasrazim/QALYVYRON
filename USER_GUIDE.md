@@ -24,6 +24,9 @@ Use the inspector's numeric position, rotation, and scale fields when you need e
 
 ## Edit a built-in mesh
 
+The viewport exposes local-space vertex markers, edge lines, and face-center handles while the mesh editor is open. Click an edge line to inspect its endpoints. Choose **Select Edge Loop** to multi-select edges; selected edges should form one connected, closed boundary before using **Create Face from Loop**. The operation accepts only supported planar, convex loops and leaves the mesh unchanged when the boundary is branched, disconnected, or geometrically invalid. For a missing face, select its existing boundary edges rather than selecting internal diagonals.
+
+
 Select a cube, sphere, cylinder, cone, or plane, then click **Edit Selected Mesh**. The early mesh editor supports two actual topology operations:
 
 1. **Vertex coordinates:** choose a vertex index and edit its X, Y, or Z coordinate. The selected vertex is marked in the viewport.
