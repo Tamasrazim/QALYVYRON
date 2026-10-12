@@ -17,6 +17,7 @@ QALYVYRON is an active mainline desktop application under development. It now ha
 - [x] Add numeric directional key-light X/Y/Z rotation controls, persist their angles, and apply the same orientation in offline renders.
 - [x] Add a custom fill-light colour picker, save the selected RGB value, and use it in the live viewport and offline renderer.
 - [x] Add a custom solid background colour, persist it in scene files, and share it between the live viewport and offline final renders.
+- [x] Add optional alpha-transparent final PNG rendering with per-pixel coverage alpha for antialiased geometry edges, while keeping the existing solid-background mode.
 - [x] Export a PNG of the viewport, labelled as a preview rather than a final render.
 - [x] Add bounded undo/redo checkpoints for common scene edits in the current implementation.
 - [x] Add Ctrl+Shift+S for Save As, F2 for renaming, Ctrl+D for duplicating the selected object, and Ctrl+Shift+F to frame visible objects.

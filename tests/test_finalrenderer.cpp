@@ -76,6 +76,7 @@ private slots:
     void fillLightPositionChangesFinalRenderAppearance();
     void fillLightColorChangesFinalRenderAppearance();
     void backgroundColorChangesFinalRenderAppearance();
+    void transparentBackgroundWritesAlphaToPng();
     void orthographicProjectionChangesFinalRender();
     void writesPngFromSceneGeometry();
 };
@@ -478,7 +479,75 @@ void FinalRendererTests::backgroundColorChangesFinalRenderAppearance()
     QVERIFY(!renderer.busy());
 }
 
+void FinalRendererTests::transparentBackgroundWritesAlphaToPng()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    auto sceneWithTransparency = [](bool transparent) {
+        QVariantMap scene = smallPlaneScene();
+        QVariantMap settings = scene.value(QStringLiteral("settings")).toMap();
+        settings.insert(QStringLiteral("transparentBackground"), transparent);
+        settings.insert(QStringLiteral("backgroundColor"), QStringLiteral("#7842a8"));
+        scene.insert(QStringLiteral("settings"), settings);
+        return scene;
+    };
+
+    FinalRenderer renderer;
+    QSignalSpy finished(&renderer, &FinalRenderer::renderFinished);
+    QVERIFY(finished.isValid());
+
+    const QString transparentPath = directory.filePath(QStringLiteral("transparent.png"));
+    QVERIFY(renderer.startRender(QUrl::fromLocalFile(transparentPath),
+                                 sceneWithTransparency(true), 64, 64, 4, 0));
+    QTRY_VERIFY_WITH_TIMEOUT(!finished.isEmpty(), 10000);
+    const QList<QVariant> transparentResult = finished.takeFirst();
+    QVERIFY2(transparentResult.at(0).toBool(),
+             qPrintable(transparentResult.at(1).toString()));
+    const QImage transparentImage(transparentPath);
+    QVERIFY(!transparentImage.isNull());
+
+    int clearPixels = 0;
+    int coveredPixels = 0;
+    int antialiasedPixels = 0;
+    for (int y = 0; y < transparentImage.height(); ++y) {
+        for (int x = 0; x < transparentImage.width(); ++x) {
+            const int alpha = qAlpha(transparentImage.pixel(x, y));
+            if (alpha == 0)
+                ++clearPixels;
+            else if (alpha == 255)
+                ++coveredPixels;
+            else
+                ++antialiasedPixels;
+        }
+    }
+
+    QVERIFY2(clearPixels > 0,
+             "Pixels outside the model must be completely transparent.");
+    QVERIFY2(coveredPixels > 0,
+             "Visible geometry pixels must remain opaque.");
+    QVERIFY2(antialiasedPixels > 0,
+             "Multi-sample edge coverage should create partially transparent boundary pixels.");
+
+    const QString opaquePath = directory.filePath(QStringLiteral("opaque.png"));
+    QVERIFY(renderer.startRender(QUrl::fromLocalFile(opaquePath),
+                                 sceneWithTransparency(false), 64, 64, 2, 0));
+    QTRY_VERIFY_WITH_TIMEOUT(!finished.isEmpty(), 10000);
+    const QList<QVariant> opaqueResult = finished.takeFirst();
+    QVERIFY2(opaqueResult.at(0).toBool(),
+             qPrintable(opaqueResult.at(1).toString()));
+    const QImage opaqueImage(opaquePath);
+    QVERIFY(!opaqueImage.isNull());
+
+    for (int y = 0; y < opaqueImage.height(); ++y) {
+        for (int x = 0; x < opaqueImage.width(); ++x)
+            QCOMPARE(qAlpha(opaqueImage.pixel(x, y)), 255);
+    }
+    QVERIFY(!renderer.busy());
+}
+
 void FinalRendererTests::orthographicProjectionChangesFinalRender()
+
 
 
 {

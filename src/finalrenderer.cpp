@@ -699,17 +699,22 @@ QVector3D tracePath(const Ray &primaryRay,
                     const QVector3D &background,
                     int maxDiffuseBounces,
                     std::mt19937 &random,
-                    std::uniform_real_distribution<float> &unitRandom)
+                    std::uniform_real_distribution<float> &unitRandom,
+                     bool *primaryRayHitsGeometry)
 {
     Ray ray = primaryRay;
     QVector3D throughput(1.0f, 1.0f, 1.0f);
     QVector3D radiance;
+    bool primaryHit = false;
     for (int bounce = 0; ; ++bounce) {
         Hit hit;
         if (!scene.closestHit(ray, &hit)) {
             radiance += componentMultiply(throughput, background);
             break;
         }
+
+        if (bounce == 0)
+            primaryHit = true;
 
         radiance += componentMultiply(
             throughput,
@@ -752,6 +757,8 @@ QVector3D tracePath(const Ray &primaryRay,
         ray.origin = hit.position + hit.normal * kRayEpsilon;
         ray.direction = bounceDirection;
     }
+    if (primaryRayHitsGeometry)
+        *primaryRayHitsGeometry = primaryHit;
     return radiance;
 }
 
@@ -984,7 +991,10 @@ void FinalRenderer::runRender(QString outputPath,
         QColor savedBackgroundColor(savedBackgroundText);
         if (!savedBackgroundColor.isValid())
             savedBackgroundColor = QColor(QStringLiteral("#171717"));
-        const QVector3D background = colorToLinear(savedBackgroundColor);
+        const bool transparentBackground =
+            settings.value(QStringLiteral("transparentBackground")).toBool();
+        const QVector3D background = transparentBackground
+            ? QVector3D(0.0f, 0.0f, 0.0f) : colorToLinear(savedBackgroundColor);
 
         QImage image(width, height, QImage::Format_ARGB32);
         if (image.isNull()) {
@@ -1006,6 +1016,7 @@ void FinalRenderer::runRender(QString outputPath,
             auto *row = reinterpret_cast<QRgb *>(image.scanLine(y));
             for (int x = 0; x < width; ++x) {
                 QVector3D accumulated;
+                int geometryCoveredSamples = 0;
                 for (int sample = 0; sample < samplesPerPixel; ++sample) {
                     const float sampleX = static_cast<float>(x) + jitter(random);
                     const float sampleY = static_cast<float>(y) + jitter(random);
@@ -1027,13 +1038,33 @@ void FinalRenderer::runRender(QString outputPath,
                         direction = (forward + right * imageX + up * imageY).normalized();
                     }
                     const Ray ray{rayOrigin, direction};
+                    bool primaryRayHitsGeometry = false;
                     accumulated += tracePath(ray, accelerator, directionalLight,
                                              keyBrightness, pointLightPosition,
                                              fillBrightness, fillTint, background,
-                                             maxDiffuseBounces, random, jitter);
+                                             maxDiffuseBounces, random, jitter,
+                                             &primaryRayHitsGeometry);
+                    if (primaryRayHitsGeometry)
+                        ++geometryCoveredSamples;
                 }
 
-                row[x] = encodePixel(accumulated / static_cast<float>(samplesPerPixel));
+                if (transparentBackground) {
+                    if (geometryCoveredSamples == 0) {
+                        row[x] = qRgba(0, 0, 0, 0);
+                    } else {
+                        // Keep RGB unassociated with alpha: average only samples that hit
+                        // geometry, then use sample coverage as the antialiased alpha value.
+                        const QVector3D surfaceColor =
+                            accumulated / static_cast<float>(geometryCoveredSamples);
+                        const QRgb encoded = encodePixel(surfaceColor);
+                        const int alpha = static_cast<int>(std::lround(
+                            255.0 * geometryCoveredSamples / samplesPerPixel));
+                        row[x] = qRgba(qRed(encoded), qGreen(encoded), qBlue(encoded),
+                                       std::clamp(alpha, 0, 255));
+                    }
+                } else {
+                    row[x] = encodePixel(accumulated / static_cast<float>(samplesPerPixel));
+                }
             }
 
             if ((y & 7) == 0 || y == height - 1)

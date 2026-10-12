@@ -48,6 +48,8 @@ ApplicationWindow {
     property bool orthographicMode: false
     // One solid background colour is used by the viewport and the offline still renderer.
     property color backgroundColor: "#171717"
+    // Transparent mode writes an alpha channel instead of filling empty pixels with the background colour.
+    property bool transparentBackground: false
     // The fill light uses one saved position for the viewport and final renderer.
     property vector3d fillLightPosition: Qt.vector3d(-160, 190, 140)
     // Keep the fill-light colour in one place so viewport and final-render colours agree.
@@ -1711,6 +1713,7 @@ ApplicationWindow {
         camera.fieldOfView = 45
         orthographicMode = false
         backgroundColor = "#171717"
+        transparentBackground = false
         keyLightRotation = Qt.vector3d(-42, -35, 0)
         keyLight.brightness = 1.7
         fillLight.brightness = 65
@@ -1766,6 +1769,7 @@ ApplicationWindow {
             settings: {
                 cameraFov: camera.fieldOfView,
                 backgroundColor: String(root.backgroundColor),
+                transparentBackground: root.transparentBackground,
                 keyLightBrightness: keyLight.brightness,
                 keyLightRotationX: root.keyLightRotation.x,
                 keyLightRotationY: root.keyLightRotation.y,
@@ -1796,6 +1800,7 @@ ApplicationWindow {
         // Start with known defaults so older scene files remain predictable.
         camera.fieldOfView = 45
         backgroundColor = "#171717"
+        transparentBackground = false
         keyLightRotation = Qt.vector3d(-42, -35, 0)
         keyLight.brightness = 1.7
         fillLight.brightness = 65
@@ -1838,6 +1843,8 @@ ApplicationWindow {
             ? "" : String(settings.backgroundColor)
         if (/^#[0-9a-f]{6}$/i.test(savedBackgroundColor))
             backgroundColor = savedBackgroundColor
+        // Older projects omit this flag, so preserve the established opaque default.
+        transparentBackground = settings.transparentBackground === true
 
         // Older scenes don't store the light position, so keep the old default for them.
         const fillX = settings.fillLightX !== undefined && Number.isFinite(Number(settings.fillLightX))
@@ -3406,7 +3413,8 @@ ApplicationWindow {
                             anchors.fill: parent
                             camera: root.orthographicMode ? orthographicCamera : camera
                             environment: SceneEnvironment {
-                                backgroundMode: SceneEnvironment.Color
+                                backgroundMode: root.transparentBackground
+                                                ? SceneEnvironment.Transparent : SceneEnvironment.Color
                                 clearColor: root.backgroundColor
                                 antialiasingMode: SceneEnvironment.MSAA
                                 antialiasingQuality: SceneEnvironment.High
@@ -4728,6 +4736,23 @@ ApplicationWindow {
                             text: "Choose…"
                             onClicked: root.openBackgroundColorPicker()
                         }
+                    }
+
+                    CheckBox {
+                        visible: !root.beginnerMode
+                        text: "Transparent background in final PNG"
+                        checked: root.transparentBackground
+                        onToggled: {
+                            if (root.transparentBackground === checked)
+                                return
+                            root.pushUndoSnapshot()
+                            root.transparentBackground = checked
+                            root.setStatus(checked
+                                ? "Final PNG will use transparent pixels outside visible geometry."
+                                : "Final PNG will use the selected solid background colour.")
+                        }
+                        ToolTip.visible: hovered
+                        ToolTip.text: "Writes alpha transparency outside the visible geometry in the offline PNG render."
                     }
 
                     Item { Layout.fillHeight: true }
