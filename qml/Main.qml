@@ -1487,6 +1487,8 @@ ApplicationWindow {
         }
         sceneObjects = []
         objectList.clear()
+        // A filter from the previous project must not hide every object in the new scene.
+        hierarchyFilter = ""
         selectedObject = null
         selectedIndex = -1
         nextObjectNumber = 1
