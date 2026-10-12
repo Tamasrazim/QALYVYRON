@@ -50,6 +50,11 @@ ApplicationWindow {
     property real renderProgressValue: 0
     property string renderStatusText: "Ready"
     property url currentProjectUrl: ""
+    property bool projectDirty: false
+    property string pendingAction: ""
+    property url pendingOpenUrl: ""
+    property var pendingOpenData: null
+    property bool continuePendingAfterSave: false
 
     ListModel {
         id: objectList
@@ -116,6 +121,7 @@ ApplicationWindow {
             stack.shift()
         undoStack = stack
         redoStack = []
+        projectDirty = true
     }
 
     function clearHistory() {
@@ -127,19 +133,87 @@ ApplicationWindow {
         const result = projectIO.saveProject(url, root.serializeScene())
         if (result.ok) {
             currentProjectUrl = url
+            projectDirty = false
             root.setStatus("Scene saved: " + result.path)
+            if (continuePendingAfterSave) {
+                continuePendingAfterSave = false
+                unsavedChangesDialog.close()
+                Qt.callLater(root.performPendingAction)
+            }
             return true
         }
 
+        if (continuePendingAfterSave) {
+            continuePendingAfterSave = false
+            pendingAction = ""
+            pendingOpenUrl = ""
+            pendingOpenData = null
+            unsavedChangesDialog.close()
+        }
         root.setStatus("Save failed: " + result.error)
         return false
     }
 
     function saveCurrentProject() {
         if (String(currentProjectUrl).length > 0)
-            saveSceneTo(currentProjectUrl)
+            return saveSceneTo(currentProjectUrl)
+        saveSceneDialog.open()
+        return false
+    }
+
+    function requestNewScene() {
+        pendingAction = "new"
+        pendingOpenUrl = ""
+        pendingOpenData = null
+        if (projectDirty)
+            unsavedChangesDialog.open()
         else
-            saveSceneDialog.open()
+            performPendingAction()
+    }
+
+    function requestOpenScene(url) {
+        const result = projectIO.loadProject(url)
+        if (!result.ok) {
+            root.setStatus("Open failed: " + result.error)
+            return
+        }
+
+        pendingAction = "open"
+        pendingOpenUrl = url
+        pendingOpenData = result.data
+        if (projectDirty)
+            unsavedChangesDialog.open()
+        else
+            performPendingAction()
+    }
+
+    function performPendingAction() {
+        const action = pendingAction
+        const openUrl = pendingOpenUrl
+        const openData = pendingOpenData
+        pendingAction = ""
+        pendingOpenUrl = ""
+        pendingOpenData = null
+
+        if (action === "new") {
+            createNewScene()
+        } else if (action === "open" && openData) {
+            currentProjectUrl = openUrl
+            clearHistory()
+            applyProject(openData)
+            projectDirty = false
+            root.setStatus("Scene opened successfully.")
+        }
+    }
+
+    function cancelPendingAction(message) {
+        continuePendingAfterSave = false
+        pendingAction = ""
+        pendingOpenUrl = ""
+        pendingOpenData = null
+        unsavedChangesDialog.close()
+        if (message)
+            root.setStatus(message)
     }
 
     function undo() {
@@ -1514,8 +1588,74 @@ ApplicationWindow {
         nameFilters: ["QALYVYRON Scene (*.qvscene)", "JSON files (*.json)"]
         defaultSuffix: "qvscene"
 
-        onAccepted: {
-            root.saveSceneTo(selectedFile)
+        onAccepted: root.saveSceneTo(selectedFile)
+        onRejected: {
+            if (root.continuePendingAfterSave)
+                root.cancelPendingAction("Save canceled. Your current scene is still open.")
+        }
+    }
+
+    Dialog {
+        id: unsavedChangesDialog
+        title: "Unsaved changes"
+        modal: true
+        focus: true
+        width: 465
+        height: 230
+        x: (root.width - width) / 2
+        y: (root.height - height) / 2
+        standardButtons: Dialog.NoButton
+
+        contentItem: ColumnLayout {
+            spacing: 14
+
+            Text {
+                Layout.fillWidth: true
+                text: "This scene has changes that aren't saved. Save it before continuing?"
+                color: root.mainText
+                font.pixelSize: 14
+                wrapMode: Text.WordWrap
+            }
+
+            Text {
+                Layout.fillWidth: true
+                text: "Your current work will stay open if you choose Cancel."
+                color: root.secondaryText
+                font.pixelSize: 11
+                wrapMode: Text.WordWrap
+            }
+
+            Item { Layout.fillHeight: true }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                Button {
+                    text: "Save"
+                    highlighted: true
+                    onClicked: {
+                        root.continuePendingAfterSave = true
+                        unsavedChangesDialog.close()
+                        root.saveCurrentProject()
+                    }
+                }
+
+                Item { Layout.fillWidth: true }
+
+                Button {
+                    text: "Discard"
+                    onClicked: {
+                        unsavedChangesDialog.close()
+                        Qt.callLater(root.performPendingAction)
+                    }
+                }
+
+                Button {
+                    text: "Cancel"
+                    onClicked: root.cancelPendingAction("Canceled. Your scene was kept.")
+                }
+            }
         }
     }
 
@@ -1525,16 +1665,7 @@ ApplicationWindow {
         fileMode: FileDialog.OpenFile
         nameFilters: ["QALYVYRON Scene (*.qvscene *.json)", "All files (*)"]
 
-        onAccepted: {
-            const result = projectIO.loadProject(selectedFile)
-            if (result.ok) {
-                root.currentProjectUrl = selectedFile
-                root.clearHistory()
-                root.applyProject(result.data)
-            } else {
-                root.setStatus("Open failed: " + result.error)
-            }
-        }
+        onAccepted: root.requestOpenScene(selectedFile)
     }
 
     FileDialog {
@@ -1829,7 +1960,7 @@ ApplicationWindow {
 
                 Button {
                     text: "New"
-                    onClicked: root.createNewScene()
+                    onClicked: root.requestNewScene()
                 }
                 Button {
                     text: "Open"
@@ -3083,7 +3214,15 @@ ApplicationWindow {
                     width: 6
                     height: 6
                     radius: 3
-                    color: "#83bd94"
+                    color: root.projectDirty ? "#d8ae57" : "#83bd94"
+                }
+                Text {
+                    text: !root.currentProjectUrl || String(root.currentProjectUrl).length === 0
+                          ? (root.projectDirty ? "New scene — unsaved changes" : "New scene — not saved yet")
+                          : (root.projectDirty ? "Unsaved changes" : "All changes saved")
+                    color: root.projectDirty ? "#d8ae57" : "#888888"
+                    font.pixelSize: 10
+                    Layout.rightMargin: 10
                 }
                 Text {
                     id: statusLabel
