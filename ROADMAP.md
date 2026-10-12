@@ -15,7 +15,7 @@ QALYVYRON is an active mainline desktop application under development. It now ha
 - [x] Add basic primitive material, camera and light controls.
 - [x] Export a PNG of the viewport, labelled as a preview rather than a final render.
 - [x] Add bounded undo/redo checkpoints for common scene edits in the current implementation.
-- [x] Add Ctrl+Shift+S for Save As and F2 for renaming the selected object.
+- [x] Add Ctrl+Shift+S for Save As, F2 for renaming, Ctrl+D for duplicating the selected object, and Ctrl+Shift+F to frame visible objects.
 - [x] Add initial local OBJ and glTF 2.0 loading using Qt Quick 3D AssetUtils.
 - [x] Pass current Linux and Windows CI jobs (Linux Qt 6 build/tests; Windows x64 build/tests, portable package staging, and packaged-app startup smoke test).
 - [ ] Run an application-level smoke test on a clean Windows machine and supported graphics hardware.

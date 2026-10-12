@@ -120,6 +120,27 @@ ApplicationWindow {
     }
 
     Shortcut {
+        // Ctrl+D duplicates the selected scene object.
+        sequence: "Ctrl+D"
+        enabled: root.selectedObject !== null && root.selectedIndex >= 0
+                 && !unsavedChangesDialog.visible
+                 && !renderProgressDialog.visible
+                 && !meshEditDialog.visible
+                 && !introDialog.visible
+        onActivated: root.duplicateSelected()
+    }
+
+    Shortcut {
+        // Ctrl+Shift+F frames the visible scene in the viewport.
+        sequence: "Ctrl+Shift+F"
+        enabled: !unsavedChangesDialog.visible
+                 && !renderProgressDialog.visible
+                 && !meshEditDialog.visible
+                 && !introDialog.visible
+        onActivated: root.frameAllObjects()
+    }
+
+    Shortcut {
         sequence: StandardKey.Open
         onActivated: openSceneDialog.open()
     }

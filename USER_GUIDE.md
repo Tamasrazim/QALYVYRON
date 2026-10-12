@@ -71,7 +71,7 @@ Use the **Undo** and **Redo** buttons in the toolbar. The current implementation
 - **Save:** the first save asks where to store the scene. Later saves update that same project file.
 - **Protection against lost work:** New, Open, and closing the app ask before replacing or closing a scene with unsaved edits. Choose Save, Discard, or Cancel. Cancel keeps the current scene open.
 - **Automatic recovery:** while the editor has unsaved changes, QALYVYRON writes a recovery snapshot to app-local storage about every 30 seconds. On next launch, you can restore the snapshot or discard it. Saving or explicitly discarding clears the recovery copy; it stays separate from the original `.qvscene` file. This is one recovery snapshot, not a versioned backup history.
-- **Save As…:** choose a new file or make a separate copy. You can also press **Ctrl+Shift+S** to open Save As. Select an object and press **F2** to focus and select its name for renaming.
+- **Save As…:** choose a new file or make a separate copy. **Ctrl+Shift+S** opens Save As. Select an object and press **F2** to focus and select its name for renaming, **Ctrl+D** to duplicate it, or **Ctrl+Shift+F** to frame all visible objects.
 - **Ctrl+S:** save the current project; opens the save dialog if the scene has not been saved before.
 - **Ctrl+O:** open a scene; **Ctrl+Z** and **Ctrl+Y** undo and redo supported edits.
 - Saving writes a validated `.qvscene` project, including embedded editable OBJ geometry and mesh edits.
