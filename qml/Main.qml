@@ -1426,8 +1426,6 @@ ApplicationWindow {
             property real editorRoughness: 0.38
             property real uniformScale: 1.0
             property url assetUrl: ""
-            property bool editorVisible: true
-            visible: editorVisible
 
             RuntimeLoader {
                 id: runtimeAssetLoader
