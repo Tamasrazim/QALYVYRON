@@ -18,6 +18,18 @@ ApplicationWindow {
     title: "QALYVYRON — 3D Studio"
     color: "#0b0b0b"
 
+    onClosing: function(closeEvent) {
+        if (allowWindowClose || !projectDirty)
+            return
+
+        closeEvent.accepted = false
+        pendingAction = "exit"
+        pendingOpenUrl = ""
+        pendingOpenData = null
+        if (!unsavedChangesDialog.visible)
+            unsavedChangesDialog.open()
+    }
+
     property color panelColor: "#111111"
     property color panelRaised: "#191919"
     property color borderColor: "#2d2d2d"
@@ -55,6 +67,7 @@ ApplicationWindow {
     property url pendingOpenUrl: ""
     property var pendingOpenData: null
     property bool continuePendingAfterSave: false
+    property bool allowWindowClose: false
 
     ListModel {
         id: objectList
@@ -203,6 +216,9 @@ ApplicationWindow {
             applyProject(openData)
             projectDirty = false
             root.setStatus("Scene opened successfully.")
+        } else if (action === "exit") {
+            allowWindowClose = true
+            Qt.quit()
         }
     }
 
