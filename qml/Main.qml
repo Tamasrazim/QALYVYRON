@@ -2469,8 +2469,57 @@ ApplicationWindow {
             ComboBox {
                 id: renderResolutionCombo
                 Layout.fillWidth: true
-                model: ["1280x720", "1920x1080", "2560x1440", "3840x2160", "7680x4320"]
+                model: ["1280x720", "1920x1080", "2560x1440", "3840x2160", "7680x4320", "Custom…"]
                 currentIndex: 1
+            }
+
+            RowLayout {
+                visible: renderResolutionCombo.currentIndex === 5
+                Layout.fillWidth: true
+                spacing: 10
+
+                Text {
+                    text: "Width"
+                    color: root.secondaryText
+                    font.pixelSize: 11
+                }
+                SpinBox {
+                    id: customRenderWidthSpinBox
+                    Layout.fillWidth: true
+                    from: 16
+                    to: 16384
+                    value: 1920
+                    editable: true
+                    validator: IntValidator { bottom: 16; top: 16384 }
+                }
+                Text {
+                    text: "Height"
+                    color: root.secondaryText
+                    font.pixelSize: 11
+                }
+                SpinBox {
+                    id: customRenderHeightSpinBox
+                    Layout.fillWidth: true
+                    from: 16
+                    to: 16384
+                    value: 1080
+                    editable: true
+                    validator: IntValidator { bottom: 16; top: 16384 }
+                }
+            }
+
+            Text {
+                visible: renderResolutionCombo.currentIndex === 5
+                Layout.fillWidth: true
+                text: {
+                    const pixels = customRenderWidthSpinBox.value * customRenderHeightSpinBox.value
+                    return "Custom output: " + customRenderWidthSpinBox.value + " × "
+                        + customRenderHeightSpinBox.value + " pixels ("
+                        + (pixels / 1000000).toFixed(2) + " megapixels). Render safety limits still apply."
+                }
+                color: "#777777"
+                font.pixelSize: 10
+                wrapMode: Text.WordWrap
             }
 
             RowLayout {
@@ -2526,9 +2575,14 @@ ApplicationWindow {
                     text: "Choose Output…"
                     highlighted: true
                     onClicked: {
-                        const parts = String(renderResolutionCombo.currentText).split("x")
-                        root.requestedRenderWidth = Number(parts[0])
-                        root.requestedRenderHeight = Number(parts[1])
+                        if (renderResolutionCombo.currentIndex === 5) {
+                            root.requestedRenderWidth = customRenderWidthSpinBox.value
+                            root.requestedRenderHeight = customRenderHeightSpinBox.value
+                        } else {
+                            const parts = String(renderResolutionCombo.currentText).split("x")
+                            root.requestedRenderWidth = Number(parts[0])
+                            root.requestedRenderHeight = Number(parts[1])
+                        }
                         root.requestedRenderSamples = renderSamplesSpinBox.value
                         root.requestedRenderBounces = renderBouncesSpinBox.value
                         renderSettingsDialog.close()

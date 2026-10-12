@@ -69,6 +69,7 @@ This stage is what separates a scene viewer from a practical 3D creation tool.
 
 - [x] Add a separate CPU offline still renderer using scene triangles, BVH acceleration, camera sampling, base color/roughness, directional and point lights, hard shadows, PNG output, cancellation, and progress.
 - [x] Add configurable diffuse indirect bounces and a bounded resolution/sample/bounce workload.
+- [x] Add a custom final-render width/height option with dimension validation and the renderer's existing total-pixel/workload safeguards.
 - [x] Aim the offline-render camera at the saved viewport focus target, including off-origin scenes, with regression coverage.
 - [x] Test that per-object metalness changes final-render output.
 - [x] Add a saved, undoable smooth-shading toggle with shared-vertex normals in the viewport and CPU final renderer, plus image regression coverage.
