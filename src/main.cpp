@@ -75,6 +75,7 @@ int main(int argc, char *argv[])
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty(QStringLiteral("projectIO"), &projectIO);
     engine.rootContext()->setContextProperty(QStringLiteral("finalRenderer"), &finalRenderer);
+    engine.addImportPath(QStringLiteral("qrc:/"));
 
     QObject::connect(
         &engine,
@@ -83,6 +84,6 @@ int main(int argc, char *argv[])
         []() { QCoreApplication::exit(EXIT_FAILURE); },
         Qt::QueuedConnection);
 
-    engine.load(QUrl(QStringLiteral("qrc:/qt/qml/Qalyvyron/Main.qml")));
+    engine.load(QUrl(QStringLiteral("qrc:/Qalyvyron/Main.qml")));
     return application.exec();
 }

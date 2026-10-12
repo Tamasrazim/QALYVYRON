@@ -39,6 +39,9 @@ set_source_files_properties(qml/Main.qml PROPERTIES QT_RESOURCE_ALIAS Main.qml)
 qt_add_qml_module(QALYVYRON
     URI Qalyvyron
     VERSION 1.0
+    # Qt 6.4 does not enable QTP0001 by default. Keep the resource layout
+    # stable across older/newer Qt builds and match the runtime import path.
+    RESOURCE_PREFIX /
     QML_FILES
         qml/Main.qml
     SOURCES
