@@ -571,7 +571,7 @@ QVariantMap ProjectIO::importStl(const QUrl &url) const
         }
     } else {
         const QByteArray trimmed = bytes.trimmed();
-        if (!trimmed.startsWith("solid", Qt::CaseInsensitive)) {
+        if (trimmed.left(5).compare("solid", Qt::CaseInsensitive) != 0) {
             return failure(QStringLiteral("The STL file has an invalid binary length and does not look like an ASCII STL."));
         }
 
