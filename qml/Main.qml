@@ -59,6 +59,10 @@ ApplicationWindow {
     property bool vertexSelectionMode: false
     property var meshEdgeSelection: []
     property bool edgeSelectionMode: false
+    // Grid snapping helps place objects neatly without typing coordinates.
+    // It only affects mouse dragging; exact numeric transform fields stay exact.
+    property bool snapMovementToGrid: false
+    property real movementSnapStep: 10
     property int requestedRenderWidth: 1920
     property int requestedRenderHeight: 1080
     property int requestedRenderSamples: 8
@@ -291,6 +295,16 @@ ApplicationWindow {
         )
         camera.lookAt(focusTarget)
         Qt.callLater(root.updateGizmo)
+    }
+
+    function snapMovementValue(value) {
+        // If snapping is off, leave the movement exactly where the mouse put it.
+        if (!snapMovementToGrid || !Number.isFinite(movementSnapStep)
+                || movementSnapStep <= 0)
+            return value
+
+        // Round each world-space coordinate to the nearest chosen grid step.
+        return Math.round(value / movementSnapStep) * movementSnapStep
     }
 
     function objectFrameRadius(object) {
@@ -2730,10 +2744,15 @@ ApplicationWindow {
                                     Qt.vector3d(mouse.x, mouse.y, selectionDepth))
                                 const start = dragStartPosition
                                 const anchor = dragStartPoint
+                                // Snap the object's world position only when the user enables it.
+                                // The starting drag position is kept unchanged, so movement stays stable.
+                                const movedX = start.x + point.x - anchor.x
+                                const movedY = start.y + point.y - anchor.y
+                                const movedZ = start.z + point.z - anchor.z
                                 movingObject.position = Qt.vector3d(
-                                    start.x + point.x - anchor.x,
-                                    start.y + point.y - anchor.y,
-                                    start.z + point.z - anchor.z
+                                    root.snapMovementValue(movedX),
+                                    root.snapMovementValue(movedY),
+                                    root.snapMovementValue(movedZ)
                                 )
 
                                 if (root.selectedIndex >= 0) {
@@ -3119,6 +3138,33 @@ ApplicationWindow {
                                 text: "Focus Selected"
                                 enabled: root.selectedObject !== null
                                 onClicked: root.focusSelectedObject()
+                            }
+                            Button {
+                                id: gridSnapButton
+                                text: root.snapMovementToGrid ? "Snap: On" : "Snap: Off"
+                                checkable: true
+                                checked: root.snapMovementToGrid
+                                onToggled: {
+                                    root.snapMovementToGrid = checked
+                                    root.setStatus(checked
+                                        ? "Grid snapping is on. Dragged objects land on the chosen grid step."
+                                        : "Grid snapping is off. Objects can move freely.")
+                                }
+                                ToolTip.visible: hovered
+                                ToolTip.text: "Toggle snapping while dragging an object."
+                            }
+                            ComboBox {
+                                id: movementSnapStepCombo
+                                Layout.preferredWidth: 92
+                                model: ["1", "5", "10", "25", "50"]
+                                currentIndex: 2
+                                onActivated: function(index) {
+                                    root.movementSnapStep = Number(textAt(index))
+                                    root.setStatus("Grid snap step set to "
+                                                   + root.movementSnapStep + " units.")
+                                }
+                                ToolTip.visible: hovered
+                                ToolTip.text: "Choose how far apart the snapping grid steps are."
                             }
                         }
                     }
