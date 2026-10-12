@@ -255,6 +255,11 @@ bool appendSceneTriangles(const QVariantMap &scene,
 
     for (const QVariant &rawObject : objects) {
         const QVariantMap object = rawObject.toMap();
+        // Older project documents omit this field, which means the object is visible.
+        if (object.contains(QStringLiteral("visible"))
+            && !object.value(QStringLiteral("visible")).toBool()) {
+            continue;
+        }
         if (object.value(QStringLiteral("kind")).toString() == QLatin1String("asset"))
             continue; // Runtime-loaded glTF is not embedded in the native scene mesh yet.
 

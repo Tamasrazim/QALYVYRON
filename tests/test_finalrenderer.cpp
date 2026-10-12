@@ -68,6 +68,7 @@ private slots:
     void rejectsInvalidRenderDimensions();
     void rejectsUnsafeRenderWorkloads();
     void cancelledRenderDoesNotWritePartialOutput();
+    void hiddenObjectsAreNotIncludedInFinalRender();
     void writesPngFromSceneGeometry();
 };
 
@@ -121,6 +122,35 @@ void FinalRendererTests::cancelledRenderDoesNotWritePartialOutput()
     const QList<QVariant> result = finished.takeFirst();
     QVERIFY(!result.at(0).toBool());
     QVERIFY(result.at(1).toString().contains(QStringLiteral("cancel"), Qt::CaseInsensitive));
+    QVERIFY(!QFileInfo::exists(path));
+    QVERIFY(!renderer.busy());
+}
+
+void FinalRendererTests::hiddenObjectsAreNotIncludedInFinalRender()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    // Hide the only mesh. A final render must not use geometry hidden in the editor.
+    QVariantMap scene = smallPlaneScene();
+    QVariantList objects = scene.value(QStringLiteral("objects")).toList();
+    QVERIFY(!objects.isEmpty());
+    QVariantMap hiddenObject = objects.first().toMap();
+    hiddenObject.insert(QStringLiteral("visible"), false);
+    scene.insert(QStringLiteral("objects"), QVariantList{hiddenObject});
+
+    FinalRenderer renderer;
+    QSignalSpy finished(&renderer, &FinalRenderer::renderFinished);
+    QVERIFY(finished.isValid());
+
+    const QString path = directory.filePath(QStringLiteral("hidden-object.png"));
+    QVERIFY(renderer.startRender(QUrl::fromLocalFile(path), scene, 48, 48, 1, 0));
+    QTRY_VERIFY_WITH_TIMEOUT(!finished.isEmpty(), 10000);
+
+    const QList<QVariant> result = finished.takeFirst();
+    QVERIFY(!result.at(0).toBool());
+    QVERIFY(result.at(1).toString().contains(QStringLiteral("No editable mesh geometry"),
+                                             Qt::CaseInsensitive));
     QVERIFY(!QFileInfo::exists(path));
     QVERIFY(!renderer.busy());
 }

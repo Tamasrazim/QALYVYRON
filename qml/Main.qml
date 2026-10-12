@@ -456,8 +456,8 @@ ApplicationWindow {
     }
 
     function focusSelectedObject() {
-        if (!selectedObject) {
-            setStatus("Select an object before focusing the view.")
+        if (!selectedObject || selectedObject.editorVisible === false) {
+            setStatus("Show an object before focusing the view on it.")
             return
         }
 
@@ -484,7 +484,8 @@ ApplicationWindow {
 
         for (let i = 0; i < sceneObjects.length; ++i) {
             const object = sceneObjects[i]
-            if (!object)
+            // Hidden objects remain in the hierarchy but should not expand the framed view.
+            if (!object || object.editorVisible === false)
                 continue
 
             const position = object.position
@@ -511,7 +512,7 @@ ApplicationWindow {
     }
 
     function updateGizmo() {
-        if (!view3d || !selectedObject) {
+        if (!view3d || !selectedObject || selectedObject.editorVisible === false) {
             gizmoVisible = false
             return
         }
@@ -559,6 +560,30 @@ ApplicationWindow {
 
         refreshInspector()
         Qt.callLater(root.updateGizmo)
+    }
+
+    function toggleObjectVisibility(index) {
+        if (index < 0 || index >= objectList.count)
+            return
+
+        const row = objectList.get(index)
+        // A missing value means visible, keeping older project files compatible.
+        const nextVisible = row.isVisible === false
+        pushUndoSnapshot()
+        objectList.setProperty(index, "isVisible", nextVisible)
+
+        for (let i = 0; i < sceneObjects.length; ++i) {
+            const object = sceneObjects[i]
+            if (object && object.editorId === row.objectId) {
+                object.editorVisible = nextVisible
+                break
+            }
+        }
+
+        if (selectedObject && selectedObject.editorId === row.objectId)
+            Qt.callLater(root.updateGizmo)
+
+        setStatus((nextVisible ? "Shown " : "Hidden ") + row.label + ".")
     }
 
     function refreshInspector() {
@@ -620,6 +645,8 @@ ApplicationWindow {
         const defaultColor = defaultColors[objectList.count % defaultColors.length]
         const colorValue = saved.color ? String(saved.color) : defaultColor
         const roughness = saved.roughness !== undefined ? Math.max(0, Math.min(1, Number(saved.roughness))) : 0.38
+        // Older scene files have no visibility field, so their objects stay visible.
+        const objectIsVisible = saved.visible === undefined ? true : Boolean(saved.visible)
 
         const object = primitiveComponent.createObject(sceneRoot, {
             editorId: objectId,
@@ -627,6 +654,7 @@ ApplicationWindow {
             editorShape: shape,
             editorColor: colorValue,
             editorRoughness: roughness,
+            editorVisible: objectIsVisible,
             editorMeshData: saved.mesh || ({}),
             uniformScale: uniformScale,
             position: Qt.vector3d(x, y, z),
@@ -651,7 +679,8 @@ ApplicationWindow {
             rx: rx, ry: ry, rz: rz,
             scale: uniformScale,
             color: colorValue,
-            roughness: roughness
+            roughness: roughness,
+            isVisible: objectIsVisible
         })
         selectObject(objectId)
         setStatus("Created " + label + ".")
@@ -710,6 +739,7 @@ ApplicationWindow {
         const ry = Number(saved.ry) || 0
         const rz = Number(saved.rz) || 0
         const uniformScale = Number(saved.scale) > 0 ? Number(saved.scale) : 1
+        const objectIsVisible = saved.visible === undefined ? true : Boolean(saved.visible)
 
         const object = importedAssetComponent.createObject(sceneRoot, {
             editorId: objectId,
@@ -718,6 +748,7 @@ ApplicationWindow {
             editorImported: true,
             editorColor: "#c8c8c8",
             editorRoughness: 0.38,
+            editorVisible: objectIsVisible,
             uniformScale: uniformScale,
             assetUrl: sourceText,
             position: Qt.vector3d(x, y, z),
@@ -742,7 +773,8 @@ ApplicationWindow {
             rx: rx, ry: ry, rz: rz,
             scale: uniformScale,
             color: "#c8c8c8",
-            roughness: 0.38
+            roughness: 0.38,
+            isVisible: objectIsVisible
         })
         selectObject(objectId)
         setStatus("Importing " + label + "…")
@@ -1262,11 +1294,13 @@ ApplicationWindow {
                 kind: row.kind || "primitive",
                 source: row.source || "",
                 mesh: row.kind === "asset" ? null : meshDataForObject(row.objectId),
+                visible: row.isVisible !== false,
                 x: row.x, y: row.y, z: row.z,
                 rx: row.rx, ry: row.ry, rz: row.rz,
                 scale: row.scale,
                 color: row.color,
-                roughness: row.roughness
+                roughness: row.roughness,
+                visible: row.isVisible !== false
             })
         }
 
@@ -1386,10 +1420,14 @@ ApplicationWindow {
             property string editorLabel: "Imported Asset"
             property string editorShape: "Imported Asset"
             property bool editorImported: true
+            property bool editorVisible: true
+            visible: editorVisible
             property color editorColor: "#c8c8c8"
             property real editorRoughness: 0.38
             property real uniformScale: 1.0
             property url assetUrl: ""
+            property bool editorVisible: true
+            visible: editorVisible
 
             RuntimeLoader {
                 id: runtimeAssetLoader
@@ -1415,6 +1453,8 @@ ApplicationWindow {
             property color editorColor: "#c8c8c8"
             property real editorRoughness: 0.38
             property real uniformScale: 1.0
+            property bool editorVisible: true
+            visible: editorVisible
             property var editorMeshData: ({})
 
             geometry: EditableGeometry {
@@ -2613,10 +2653,12 @@ ApplicationWindow {
                             required property string objectId
                             required property string label
                             required property string shape
+                            required property bool isVisible
 
                             width: hierarchyView.width
                             height: 39
                             radius: 3
+                            opacity: isVisible ? 1.0 : 0.48
                             color: root.selectedIndex === index ? "#292929" : "transparent"
                             border.color: root.selectedIndex === index ? "#666666" : "transparent"
 
@@ -2648,10 +2690,23 @@ ApplicationWindow {
                                         font.pixelSize: 9
                                     }
                                 }
+
+                                Button {
+                                    Layout.preferredWidth: 31
+                                    Layout.preferredHeight: 27
+                                    text: isVisible ? "◉" : "○"
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: isVisible ? "Hide this object" : "Show this object"
+                                    onClicked: root.toggleObjectVisibility(index)
+                                }
                             }
 
                             MouseArea {
-                                anchors.fill: parent
+                                // Leave the right edge free so the visibility button receives clicks.
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                width: Math.max(0, parent.width - 42)
                                 onClicked: root.selectObject(objectId)
                             }
                         }

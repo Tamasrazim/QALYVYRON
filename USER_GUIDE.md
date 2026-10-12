@@ -6,7 +6,7 @@ This guide covers the current mainline application. Remaining feature gaps are l
 
 The first launch opens a welcome screen. Choose **Start creating** to enter the workspace, **Take the quick tour** to learn the basics, or **Import a model** to open a local asset. Check **Don't show this screen when I launch QALYVYRON** to keep it closed on later launches; uncheck it to show the welcome screen again.
 
-A new scene starts with one cube so there is only one thing to focus on. Use **Add a Shape** to add a cube, ball, cylinder, cone, or plane. Use **Your Objects** to select a shape, rename it, copy it, or remove it.
+A new scene starts with one cube so there is only one thing to focus on. Use **Add a Shape** to add a cube, ball, cylinder, cone, or plane. Use **Your Objects** to select a shape, rename it, copy it, or remove it. Use the small **◉ / ○** button beside an object to hide or show it without deleting it. Hidden objects remain in the hierarchy so you can bring them back later; their visibility is saved with the scene, can be undone/redone, and hidden meshes are skipped by the final PNG renderer.
 
 **Simple view** is enabled by default. It shows six clickable color swatches and a size slider, while keeping detailed numeric transforms, lighting, camera, roughness, and mesh-editing tools out of the way. Hover over a color to see its name. Click **Show all tools** at the top when you need more control. Click **Simple view** to return to the beginner layout.
 
