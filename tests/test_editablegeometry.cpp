@@ -131,9 +131,10 @@ void EditableGeometryTests::bevelsCubeEdgeAndKeepsClosedTopology()
     QCOMPARE(geometry.edgeCount(), 12);
 
     QVERIFY(geometry.bevelEdge(0, 5.0));
-    QCOMPARE(geometry.vertexCount(), 12);
+    // The two replaced corner vertices are removed instead of being left orphaned.
+    QCOMPARE(geometry.vertexCount(), 10);
     QCOMPARE(geometry.faceCount(), 7);
-    QCOMPARE(geometry.edgeCount(), 17);
+    QCOMPARE(geometry.edgeCount(), 15);
 
     for (int face = 0; face < geometry.faceCount(); ++face)
         QVERIFY2(geometry.faceNormal(face).length() > 0.9f,

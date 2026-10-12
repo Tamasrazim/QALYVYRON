@@ -1019,6 +1019,35 @@ bool EditableGeometry::bevelEdge(int edgeIndex, double distance)
     }
     candidateFaces.append(bevelFace);
 
+    // The two old corner vertices are no longer referenced after a bevel.
+    // Remove them now so the saved mesh contains no isolated vertices.
+    QVector<bool> usedVertices(candidateVertices.size(), false);
+    for (const QVector<int> &face : candidateFaces) {
+        for (const int vertexIndex : face) {
+            if (vertexIndex < 0 || vertexIndex >= usedVertices.size())
+                return false;
+            usedVertices[vertexIndex] = true;
+        }
+    }
+
+    QVector<int> vertexRemap(candidateVertices.size(), -1);
+    QVector<QVector3D> compactVertices;
+    compactVertices.reserve(candidateVertices.size());
+    for (int index = 0; index < candidateVertices.size(); ++index) {
+        if (!usedVertices.at(index))
+            continue;
+        vertexRemap[index] = compactVertices.size();
+        compactVertices.append(candidateVertices.at(index));
+    }
+    for (QVector<int> &face : candidateFaces) {
+        for (int &vertexIndex : face) {
+            vertexIndex = vertexRemap.at(vertexIndex);
+            if (vertexIndex < 0)
+                return false;
+        }
+    }
+    candidateVertices = compactVertices;
+
     qint64 renderedVertices = 0;
     QHash<quint64, int> edgeUseCounts;
     for (const QVector<int> &face : candidateFaces) {
