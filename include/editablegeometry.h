@@ -39,6 +39,7 @@ public:
     Q_INVOKABLE bool mergeVertices(int sourceIndex, int targetIndex);
     Q_INVOKABLE bool createFace(const QVariantList &vertexIndices);
     Q_INVOKABLE bool createFaceFromEdges(const QVariantList &edgeIndices);
+    Q_INVOKABLE bool subdivideEdge(int edgeIndex);
     Q_INVOKABLE QVariantMap serializeMesh() const;
     Q_INVOKABLE bool loadMesh(const QVariantMap &data);
 

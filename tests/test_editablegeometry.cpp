@@ -13,6 +13,8 @@ private slots:
     void cubeHasEditableTopology();
     void edgeIndexExposesUniqueEdgesAndCenters();
     void edgeIndexTracksTopologyChanges();
+    void subdividingEdgeAddsOneMidpointAndPreservesFaces();
+    void invalidEdgeSubdivisionIsAtomic();
     void closedEdgeLoopCreatesFaceForDeletedSurface();
     void invalidEdgeLoopsAreRejectedAtomically();
     void primitiveShapesHaveExpectedTopology();
@@ -82,6 +84,51 @@ void EditableGeometryTests::edgeIndexTracksTopologyChanges()
     QCOMPARE(geometry.edgeCount(), 4);
 }
 
+void EditableGeometryTests::subdividingEdgeAddsOneMidpointAndPreservesFaces()
+{
+    EditableGeometry geometry;
+    const QVariantList endpoints = geometry.edgeVertexIndices(0);
+    QCOMPARE(endpoints.size(), 2);
+    const QVector3D a = geometry.vertexPosition(endpoints.at(0).toInt());
+    const QVector3D b = geometry.vertexPosition(endpoints.at(1).toInt());
+    const QVector3D expectedMidpoint = (a + b) * 0.5f;
+    const int originalFaces = geometry.faceCount();
+
+    QVERIFY(geometry.subdivideEdge(0));
+    QCOMPARE(geometry.vertexCount(), 9);
+    QCOMPARE(geometry.faceCount(), originalFaces);
+    QCOMPARE(geometry.edgeCount(), 13);
+    QCOMPARE(geometry.vertexPosition(8), expectedMidpoint);
+
+    int facesWithMidpoint = 0;
+    for (int faceIndex = 0; faceIndex < geometry.faceCount(); ++faceIndex) {
+        const QVariantList face = geometry.serializeMesh()
+            .value(QStringLiteral("faces")).toList().at(faceIndex).toList();
+        if (face.contains(8))
+            ++facesWithMidpoint;
+        QVERIFY(geometry.faceNormal(faceIndex).length() > 0.9f);
+    }
+    QCOMPARE(facesWithMidpoint, 2);
+
+    geometry.setShape(QStringLiteral("Plane"));
+    QCOMPARE(geometry.edgeCount(), 4);
+    QVERIFY(geometry.subdivideEdge(0));
+    QCOMPARE(geometry.vertexCount(), 5);
+    QCOMPARE(geometry.edgeCount(), 5);
+    QCOMPARE(geometry.faceCount(), 1);
+}
+
+void EditableGeometryTests::invalidEdgeSubdivisionIsAtomic()
+{
+    EditableGeometry geometry;
+    const QVariantMap before = geometry.serializeMesh();
+    const int originalEdges = geometry.edgeCount();
+
+    QVERIFY(!geometry.subdivideEdge(-1));
+    QVERIFY(!geometry.subdivideEdge(originalEdges));
+    QCOMPARE(geometry.serializeMesh(), before);
+    QCOMPARE(geometry.edgeCount(), originalEdges);
+}
 void EditableGeometryTests::closedEdgeLoopCreatesFaceForDeletedSurface()
 {
     EditableGeometry geometry;

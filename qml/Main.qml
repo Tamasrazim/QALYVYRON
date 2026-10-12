@@ -707,6 +707,31 @@ ApplicationWindow {
         refreshMeshEditFields()
         setStatus("Created a face from the selected edge loop.")
     }
+    function subdivideSelectedEdge() {
+        const geometry = selectedEditableGeometry()
+        if (!geometry || edgeIndexSpinner.value < 0 || edgeIndexSpinner.value >= geometry.edgeCount) {
+            setStatus("Select a valid mesh edge first.")
+            return
+        }
+
+        const selectedEdge = edgeIndexSpinner.value
+        const midpointIndex = geometry.vertexCount
+        pushUndoSnapshot()
+        if (!geometry.subdivideEdge(selectedEdge)) {
+            setStatus("Edge subdivision was rejected; the mesh remains unchanged.")
+            return
+        }
+
+        clearMeshEdgeSelection()
+        edgeSelectionMode = false
+        clearMeshVertexSelection()
+        vertexSelectionMode = false
+        vertexIndexSpinner.value = midpointIndex
+        edgeIndexSpinner.value = Math.min(selectedEdge, geometry.edgeCount - 1)
+        refreshMeshEditFields()
+        setStatus("Subdivided edge " + selectedEdge + "; the new midpoint vertex is selected.")
+    }
+
 
     function createFaceFromSelectedVertices() {
         const geometry = selectedEditableGeometry()
@@ -1514,6 +1539,16 @@ ApplicationWindow {
                     color: root.secondaryText
                     font.pixelSize: 10
                     wrapMode: Text.WordWrap
+                }
+                Button {
+                    Layout.fillWidth: true
+                    text: "Subdivide Edge"
+                    enabled: root.selectedObject !== null
+                             && !root.selectedObject.editorImported
+                             && root.selectedEditableGeometry() !== null
+                             && edgeIndexSpinner.value >= 0
+                             && edgeIndexSpinner.value < root.selectedEditableGeometry().edgeCount
+                    onClicked: root.subdivideSelectedEdge()
                 }
 
                 GridLayout {

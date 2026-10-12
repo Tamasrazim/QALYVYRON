@@ -778,6 +778,71 @@ bool EditableGeometry::createFaceFromEdges(const QVariantList &edgeIndices)
     return createFace(orderedIndices);
 }
 
+bool EditableGeometry::subdivideEdge(int edgeIndex)
+{
+    if (edgeIndex < 0 || edgeIndex >= m_edges.size()
+        || m_vertices.size() >= kMaximumVertices) {
+        return false;
+    }
+
+    const QPair<int, int> edge = m_edges.at(edgeIndex);
+    const int first = edge.first;
+    const int second = edge.second;
+    if (first < 0 || second < 0 || first >= m_vertices.size()
+        || second >= m_vertices.size() || first == second) {
+        return false;
+    }
+
+    const QVector3D midpoint = (m_vertices.at(first) + m_vertices.at(second)) * 0.5f;
+    if (!finiteVector(midpoint) || std::abs(midpoint.x()) > 1.0e6f
+        || std::abs(midpoint.y()) > 1.0e6f || std::abs(midpoint.z()) > 1.0e6f) {
+        return false;
+    }
+
+    const int midpointIndex = m_vertices.size();
+    QVector<QVector<int>> candidateFaces;
+    candidateFaces.reserve(m_faces.size());
+    bool foundAdjacentFace = false;
+    qint64 projectedRenderedVertices = 0;
+
+    // Build a candidate topology first. A valid edge gets one midpoint in
+    // every incident face boundary, preserving the surrounding surfaces.
+    for (const QVector<int> &face : m_faces) {
+        if (face.size() < 3)
+            return false;
+
+        QVector<int> candidate;
+        candidate.reserve(face.size() + 1);
+        for (int i = 0; i < face.size(); ++i) {
+            const int current = face.at(i);
+            const int next = face.at((i + 1) % face.size());
+            candidate.append(current);
+            if ((current == first && next == second)
+                || (current == second && next == first)) {
+                candidate.append(midpointIndex);
+                foundAdjacentFace = true;
+            }
+        }
+
+        if (candidate.size() > kMaximumFaceCorners)
+            return false;
+        projectedRenderedVertices += static_cast<qint64>(candidate.size() - 2) * 3;
+        if (projectedRenderedVertices > kMaximumRenderedVertices)
+            return false;
+        candidateFaces.append(candidate);
+    }
+
+    if (!foundAdjacentFace)
+        return false;
+
+    // Commit only after the entire candidate has passed the limits above.
+    m_vertices.append(midpoint);
+    m_faces = candidateFaces;
+    rebuildGeometry();
+    emit meshChanged();
+    return true;
+}
+
 QVariantMap EditableGeometry::serializeMesh() const
 {
     QVariantList vertices;
