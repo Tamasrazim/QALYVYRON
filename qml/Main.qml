@@ -488,6 +488,51 @@ ApplicationWindow {
         setStatus("Updated directional key-light rotation.")
     }
 
+    // Use the same dimension and ray-work limits that the C++ renderer enforces.
+    function selectedRenderWidth() {
+        if (renderResolutionCombo.currentIndex === 5)
+            return customRenderWidthSpinBox.value
+        return Number(String(renderResolutionCombo.currentText).split("x")[0])
+    }
+
+    function selectedRenderHeight() {
+        if (renderResolutionCombo.currentIndex === 5)
+            return customRenderHeightSpinBox.value
+        return Number(String(renderResolutionCombo.currentText).split("x")[1])
+    }
+
+    function renderSettingsWithinBudget() {
+        const width = selectedRenderWidth()
+        const height = selectedRenderHeight()
+        const samples = renderSamplesSpinBox.value
+        const bounces = renderBouncesSpinBox.value
+        if (!Number.isFinite(width) || !Number.isFinite(height)
+                || width < 16 || height < 16 || width > 16384 || height > 16384)
+            return false
+        const pixels = width * height
+        return pixels <= 33554432
+                && pixels * samples * (bounces + 1) <= 268435456
+    }
+
+    function renderBudgetMessage() {
+        const width = selectedRenderWidth()
+        const height = selectedRenderHeight()
+        const samples = renderSamplesSpinBox.value
+        const bounces = renderBouncesSpinBox.value
+        if (!Number.isFinite(width) || !Number.isFinite(height)
+                || width < 16 || height < 16 || width > 16384 || height > 16384)
+            return "Choose width and height from 16 to 16,384 pixels."
+        const pixels = width * height
+        if (pixels > 33554432)
+            return "This output exceeds the 33.5-million-pixel limit. Choose smaller dimensions."
+        const workload = pixels * samples * (bounces + 1)
+        if (workload > 268435456)
+            return "This setting exceeds the render workload limit. Lower the sample count, bounce depth, or output resolution."
+        return "Within safety limits: " + (pixels / 1000000).toFixed(2)
+                + " megapixels · " + samples + " samples/pixel · "
+                + bounces + " diffuse bounce(s)."
+    }
+
     function openBackgroundColorPicker() {
         backgroundColorDialog.selectedColor = backgroundColor
         backgroundColorDialog.open()
@@ -2522,6 +2567,14 @@ ApplicationWindow {
                 wrapMode: Text.WordWrap
             }
 
+            Text {
+                Layout.fillWidth: true
+                text: root.renderBudgetMessage()
+                color: root.renderSettingsWithinBudget() ? "#777777" : "#bcbcbc"
+                font.pixelSize: 10
+                wrapMode: Text.WordWrap
+            }
+
             RowLayout {
                 Layout.fillWidth: true
                 Text {
@@ -2574,6 +2627,9 @@ ApplicationWindow {
                 Button {
                     text: "Choose Output…"
                     highlighted: true
+                    enabled: root.renderSettingsWithinBudget()
+                    ToolTip.visible: hovered && !enabled
+                    ToolTip.text: root.renderBudgetMessage()
                     onClicked: {
                         if (renderResolutionCombo.currentIndex === 5) {
                             root.requestedRenderWidth = customRenderWidthSpinBox.value
