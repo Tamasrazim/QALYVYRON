@@ -693,74 +693,9 @@ ApplicationWindow {
             return
         }
 
-        const adjacency = ({})
-        for (const edgeIndex of meshEdgeSelection) {
-            const endpoints = geometry.edgeVertexIndices(edgeIndex)
-            if (!endpoints || endpoints.length !== 2) {
-                setStatus("Edge selection became invalid after a topology change. Select the edges again.")
-                return
-            }
-
-            const a = Number(endpoints[0])
-            const b = Number(endpoints[1])
-            if (!adjacency[a])
-                adjacency[a] = []
-            if (!adjacency[b])
-                adjacency[b] = []
-            adjacency[a].push(b)
-            adjacency[b].push(a)
-        }
-
-        const vertexKeys = Object.keys(adjacency)
-        for (const key of vertexKeys) {
-            if (adjacency[key].length !== 2) {
-                setStatus("Face creation needs one unbranched closed edge loop.")
-                return
-            }
-        }
-
-        const firstEndpoints = geometry.edgeVertexIndices(meshEdgeSelection[0])
-        const start = Number(firstEndpoints[0])
-        let previous = -1
-        let current = start
-        const orderedVertices = []
-
-        while (true) {
-            if (orderedVertices.indexOf(current) >= 0) {
-                if (current !== start) {
-                    setStatus("Selected edges do not form a simple closed loop.")
-                    return
-                }
-                break
-            }
-
-            orderedVertices.push(current)
-            const neighbors = adjacency[current]
-            if (!neighbors || neighbors.length !== 2) {
-                setStatus("Selected edges do not form a closed loop.")
-                return
-            }
-
-            const next = neighbors[0] === previous ? neighbors[1] : neighbors[0]
-            previous = current
-            current = next
-
-            if (current === start)
-                break
-            if (orderedVertices.length > meshEdgeSelection.length) {
-                setStatus("Selected edges do not form a closed loop.")
-                return
-            }
-        }
-
-        if (current !== start || orderedVertices.length !== meshEdgeSelection.length) {
-            setStatus("Select the edges of one connected loop only.")
-            return
-        }
-
         pushUndoSnapshot()
-        if (!geometry.createFace(orderedVertices)) {
-            setStatus("Face creation was rejected. The loop must be planar, convex, and non-degenerate.")
+        if (!geometry.createFaceFromEdges(meshEdgeSelection)) {
+            setStatus("Face creation was rejected. Select one connected, closed loop that is planar and convex.")
             return
         }
 

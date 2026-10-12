@@ -13,6 +13,8 @@ private slots:
     void cubeHasEditableTopology();
     void edgeIndexExposesUniqueEdgesAndCenters();
     void edgeIndexTracksTopologyChanges();
+    void closedEdgeLoopCreatesFaceForDeletedSurface();
+    void invalidEdgeLoopsAreRejectedAtomically();
     void primitiveShapesHaveExpectedTopology();
     void vertexEditsChangeSerializedMesh();
     void extrudingFaceAddsCapAndSides();
@@ -78,6 +80,68 @@ void EditableGeometryTests::edgeIndexTracksTopologyChanges()
 
     geometry.setShape(QStringLiteral("Plane"));
     QCOMPARE(geometry.edgeCount(), 4);
+}
+
+void EditableGeometryTests::closedEdgeLoopCreatesFaceForDeletedSurface()
+{
+    EditableGeometry geometry;
+    QVERIFY(geometry.deleteFace(0));
+    const int originalFaceCount = geometry.faceCount();
+
+    QVariantList boundaryEdges;
+    for (int edgeIndex = 0; edgeIndex < geometry.edgeCount(); ++edgeIndex) {
+        const QVariantList endpoints = geometry.edgeVertexIndices(edgeIndex);
+        const int a = endpoints.at(0).toInt();
+        const int b = endpoints.at(1).toInt();
+        if (a >= 4 && a <= 7 && b >= 4 && b <= 7)
+            boundaryEdges.append(edgeIndex);
+    }
+
+    QCOMPARE(boundaryEdges.size(), 4);
+    QVERIFY(geometry.createFaceFromEdges(boundaryEdges));
+    QCOMPARE(geometry.faceCount(), originalFaceCount + 1);
+    QCOMPARE(geometry.vertexCount(), 8);
+}
+
+void EditableGeometryTests::invalidEdgeLoopsAreRejectedAtomically()
+{
+    EditableGeometry openBoundary;
+    QVERIFY(openBoundary.deleteFace(0));
+    QVariantList topEdges;
+    for (int edgeIndex = 0; edgeIndex < openBoundary.edgeCount(); ++edgeIndex) {
+        const QVariantList endpoints = openBoundary.edgeVertexIndices(edgeIndex);
+        const int a = endpoints.at(0).toInt();
+        const int b = endpoints.at(1).toInt();
+        if (a >= 4 && a <= 7 && b >= 4 && b <= 7)
+            topEdges.append(edgeIndex);
+    }
+    QCOMPARE(topEdges.size(), 4);
+
+    QVariantMap before = openBoundary.serializeMesh();
+    QVariantList openChain = topEdges;
+    openChain.removeLast();
+    QVERIFY(!openBoundary.createFaceFromEdges(openChain));
+    QCOMPARE(openBoundary.serializeMesh(), before);
+
+    QVariantList duplicateEdge{topEdges.first(), topEdges.first(), topEdges.at(1)};
+    QVERIFY(!openBoundary.createFaceFromEdges(duplicateEdge));
+    QCOMPARE(openBoundary.serializeMesh(), before);
+
+    EditableGeometry disconnected;
+    QVariantList twoLoops;
+    for (int edgeIndex = 0; edgeIndex < disconnected.edgeCount(); ++edgeIndex) {
+        const QVariantList endpoints = disconnected.edgeVertexIndices(edgeIndex);
+        const int a = endpoints.at(0).toInt();
+        const int b = endpoints.at(1).toInt();
+        const bool top = a >= 4 && a <= 7 && b >= 4 && b <= 7;
+        const bool bottom = a >= 0 && a <= 3 && b >= 0 && b <= 3;
+        if (top || bottom)
+            twoLoops.append(edgeIndex);
+    }
+    QCOMPARE(twoLoops.size(), 8);
+    before = disconnected.serializeMesh();
+    QVERIFY(!disconnected.createFaceFromEdges(twoLoops));
+    QCOMPARE(disconnected.serializeMesh(), before);
 }
 
 void EditableGeometryTests::primitiveShapesHaveExpectedTopology()

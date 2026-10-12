@@ -1,6 +1,7 @@
 #include "editablegeometry.h"
 
 #include <QByteArray>
+#include <QHash>
 #include <QVariantList>
 #include <QSet>
 #include <QVector2D>
@@ -650,6 +651,85 @@ bool EditableGeometry::createFace(const QVariantList &vertexIndices)
     rebuildGeometry();
     emit meshChanged();
     return true;
+}
+
+bool EditableGeometry::createFaceFromEdges(const QVariantList &edgeIndices)
+{
+    if (edgeIndices.size() < 3 || edgeIndices.size() > kMaximumFaceCorners)
+        return false;
+
+    QVector<QPair<int, int>> selectedEdges;
+    selectedEdges.reserve(edgeIndices.size());
+    QSet<int> uniqueEdgeIndices;
+    QHash<int, QVector<int>> adjacency;
+
+    for (const QVariant &rawIndex : edgeIndices) {
+        bool converted = false;
+        const int edgeIndex = rawIndex.toInt(&converted);
+        if (!converted || edgeIndex < 0 || edgeIndex >= m_edges.size()
+            || uniqueEdgeIndices.contains(edgeIndex)) {
+            return false;
+        }
+
+        uniqueEdgeIndices.insert(edgeIndex);
+        const QPair<int, int> edge = m_edges.at(edgeIndex);
+        if (edge.first < 0 || edge.second < 0
+            || edge.first >= m_vertices.size() || edge.second >= m_vertices.size()
+            || edge.first == edge.second) {
+            return false;
+        }
+
+        selectedEdges.append(edge);
+        adjacency[edge.first].append(edge.second);
+        adjacency[edge.second].append(edge.first);
+    }
+
+    // A simple boundary loop has exactly two selected neighbours at each
+    // vertex. This rejects open chains and branched selections before mutation.
+    for (auto it = adjacency.cbegin(); it != adjacency.cend(); ++it) {
+        if (it.value().size() != 2)
+            return false;
+    }
+
+    const int start = selectedEdges.first().first;
+    int previous = -1;
+    int current = start;
+    QVector<int> orderedVertices;
+    orderedVertices.reserve(selectedEdges.size());
+
+    while (true) {
+        if (orderedVertices.contains(current))
+            return false;
+
+        orderedVertices.append(current);
+        const auto it = adjacency.constFind(current);
+        if (it == adjacency.cend() || it.value().size() != 2)
+            return false;
+
+        const QVector<int> &neighbors = it.value();
+        const int next = neighbors.at(0) == previous ? neighbors.at(1) : neighbors.at(0);
+        previous = current;
+        current = next;
+
+        if (current == start)
+            break;
+        if (orderedVertices.size() >= selectedEdges.size())
+            return false;
+    }
+
+    // Degree checks alone allow multiple disconnected loops. The traversal
+    // must account for every selected edge in the same simple cycle.
+    if (orderedVertices.size() != selectedEdges.size())
+        return false;
+
+    QVariantList orderedIndices;
+    orderedIndices.reserve(orderedVertices.size());
+    for (const int vertexIndex : orderedVertices)
+        orderedIndices.append(vertexIndex);
+
+    // createFace owns the coplanarity, convexity, self-intersection, safety,
+    // mesh rebuild and notification checks. No topology changes occur before it.
+    return createFace(orderedIndices);
 }
 
 QVariantMap EditableGeometry::serializeMesh() const
