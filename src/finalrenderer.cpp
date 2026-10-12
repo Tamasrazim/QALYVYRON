@@ -944,8 +944,20 @@ void FinalRenderer::runRender(QString outputPath,
         const QVector3D up = QVector3D::crossProduct(right, forward).normalized();
         const float imageAspect = static_cast<float>(width) / height;
         const float halfFovScale = std::tan(fov * kPi / 360.0f);
+        const double keyRotationX = std::clamp(
+            numberOr(settings, QStringLiteral("keyLightRotationX"), -42.0), -180.0, 180.0);
+        const double keyRotationY = std::clamp(
+            numberOr(settings, QStringLiteral("keyLightRotationY"), -35.0), -180.0, 180.0);
+        const double keyRotationZ = std::clamp(
+            numberOr(settings, QStringLiteral("keyLightRotationZ"), 0.0), -180.0, 180.0);
+        const QQuaternion keyOrientation = QQuaternion::fromEulerAngles(
+            static_cast<float>(keyRotationX),
+            static_cast<float>(keyRotationY),
+            static_cast<float>(keyRotationZ));
+        // DirectionalLight shines along its rotated local -Z axis; lighting uses the
+        // opposite vector, from the surface back toward the light source.
         const QVector3D directionalLight =
-            QVector3D(-0.48f, 0.72f, 0.50f).normalized();
+            keyOrientation.rotatedVector(QVector3D(0, 0, 1)).normalized();
         const float keyBrightness = static_cast<float>(std::clamp(
             numberOr(settings, QStringLiteral("keyLightBrightness"), 1.7), 0.0, 4.0));
         const float fillBrightness = static_cast<float>(std::clamp(

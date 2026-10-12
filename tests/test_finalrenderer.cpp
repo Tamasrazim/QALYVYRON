@@ -72,6 +72,7 @@ private slots:
     void offlineRenderRespectsViewportFocusTarget();
     void metalnessChangesFinalRenderAppearance();
     void smoothShadingChangesFinalRenderAppearance();
+    void keyLightRotationChangesFinalRenderAppearance();
     void fillLightPositionChangesFinalRenderAppearance();
     void orthographicProjectionChangesFinalRender();
     void writesPngFromSceneGeometry();
@@ -261,7 +262,61 @@ void FinalRendererTests::metalnessChangesFinalRenderAppearance()
     QVERIFY(!renderer.busy());
 }
 
+void FinalRendererTests::keyLightRotationChangesFinalRenderAppearance()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    auto sceneWithKeyLightX = [](double x) {
+        QVariantMap scene = smallPlaneScene();
+        QVariantMap settings = scene.value(QStringLiteral("settings")).toMap();
+        settings.insert(QStringLiteral("keyLightRotationX"), x);
+        settings.insert(QStringLiteral("keyLightRotationY"), -35.0);
+        settings.insert(QStringLiteral("keyLightRotationZ"), 0.0);
+        scene.insert(QStringLiteral("settings"), settings);
+        return scene;
+    };
+
+    FinalRenderer renderer;
+    QSignalSpy finished(&renderer, &FinalRenderer::renderFinished);
+    QVERIFY(finished.isValid());
+
+    const QString upperPath = directory.filePath(QStringLiteral("key-light-upper.png"));
+    QVERIFY(renderer.startRender(QUrl::fromLocalFile(upperPath),
+                                 sceneWithKeyLightX(-42.0), 64, 64, 2, 0));
+    QTRY_VERIFY_WITH_TIMEOUT(!finished.isEmpty(), 10000);
+    const QList<QVariant> upperResult = finished.takeFirst();
+    QVERIFY2(upperResult.at(0).toBool(), qPrintable(upperResult.at(1).toString()));
+    const QImage upperImage(upperPath);
+    QVERIFY(!upperImage.isNull());
+
+    const QString lowerPath = directory.filePath(QStringLiteral("key-light-lower.png"));
+    QVERIFY(renderer.startRender(QUrl::fromLocalFile(lowerPath),
+                                 sceneWithKeyLightX(40.0), 64, 64, 2, 0));
+    QTRY_VERIFY_WITH_TIMEOUT(!finished.isEmpty(), 10000);
+    const QList<QVariant> lowerResult = finished.takeFirst();
+    QVERIFY2(lowerResult.at(0).toBool(), qPrintable(lowerResult.at(1).toString()));
+    const QImage lowerImage(lowerPath);
+    QVERIFY(!lowerImage.isNull());
+
+    qint64 totalPixelDifference = 0;
+    for (int y = 0; y < upperImage.height(); ++y) {
+        const auto *upperRow = reinterpret_cast<const QRgb *>(upperImage.constScanLine(y));
+        const auto *lowerRow = reinterpret_cast<const QRgb *>(lowerImage.constScanLine(y));
+        for (int x = 0; x < upperImage.width(); ++x) {
+            totalPixelDifference += std::abs(qRed(upperRow[x]) - qRed(lowerRow[x]));
+            totalPixelDifference += std::abs(qGreen(upperRow[x]) - qGreen(lowerRow[x]));
+            totalPixelDifference += std::abs(qBlue(upperRow[x]) - qBlue(lowerRow[x]));
+        }
+    }
+
+    QVERIFY2(totalPixelDifference > 100,
+             "Changing the directional key-light rotation must change the final image.");
+    QVERIFY(!renderer.busy());
+}
+
 void FinalRendererTests::fillLightPositionChangesFinalRenderAppearance()
+
 {
     QTemporaryDir directory;
     QVERIFY(directory.isValid());

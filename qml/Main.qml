@@ -48,6 +48,8 @@ ApplicationWindow {
     property bool orthographicMode: false
     // The fill light uses one saved position for the viewport and final renderer.
     property vector3d fillLightPosition: Qt.vector3d(-160, 190, 140)
+    // Euler angles define the key-light direction in both the viewport and final renderer.
+    property vector3d keyLightRotation: Qt.vector3d(-42, -35, 0)
     property real gizmoX: 0
     property real gizmoY: 0
     property real gizmoDepth: 1
@@ -378,6 +380,47 @@ ApplicationWindow {
         fillLightPosition = Qt.vector3d(x, y, z)
         refreshFillLightPositionFields()
         setStatus("Updated fill-light position.")
+    }
+
+    // Keep key-light angle fields in sync when a scene is restored or history is replayed.
+    function refreshKeyLightRotationFields() {
+        keyLightRotationXField.text = Number(keyLightRotation.x).toFixed(1)
+        keyLightRotationYField.text = Number(keyLightRotation.y).toFixed(1)
+        keyLightRotationZField.text = Number(keyLightRotation.z).toFixed(1)
+    }
+
+    // Rotate the directional key light on one axis, without changing its brightness.
+    function updateKeyLightRotation(axis, inputText) {
+        const parsed = Number(inputText)
+        if (!Number.isFinite(parsed)) {
+            refreshKeyLightRotationFields()
+            setStatus("Enter a valid key-light angle.")
+            return
+        }
+
+        const current = keyLightRotation
+        let x = current.x, y = current.y, z = current.z
+        const value = Math.max(-180, Math.min(180, parsed))
+        if (axis === "x") x = value
+        else if (axis === "y") y = value
+        else if (axis === "z") z = value
+        else {
+            refreshKeyLightRotationFields()
+            return
+        }
+
+        if (Math.abs(x - current.x) < 0.0001
+                && Math.abs(y - current.y) < 0.0001
+                && Math.abs(z - current.z) < 0.0001) {
+            refreshKeyLightRotationFields()
+            return
+        }
+
+        // Undo restores the old direction because the angles are part of the scene settings.
+        pushUndoSnapshot()
+        keyLightRotation = Qt.vector3d(x, y, z)
+        refreshKeyLightRotationFields()
+        setStatus("Updated directional key-light rotation.")
     }
 
     function updateCamera() {
@@ -1582,12 +1625,14 @@ ApplicationWindow {
         focusTarget.position = Qt.vector3d(0, 0, 0)
         camera.fieldOfView = 45
         orthographicMode = false
+        keyLightRotation = Qt.vector3d(-42, -35, 0)
         keyLight.brightness = 1.7
         fillLight.brightness = 65
         fillLightPosition = Qt.vector3d(-160, 190, 140)
         fillLight.color = "#ffffff"
         fillTintCombo.currentIndex = 0
         refreshFillLightPositionFields()
+        refreshKeyLightRotationFields()
         updateCamera()
         projectDirty = editorReady
         setStatus("New scene ready.")
@@ -1634,6 +1679,9 @@ ApplicationWindow {
             settings: {
                 cameraFov: camera.fieldOfView,
                 keyLightBrightness: keyLight.brightness,
+                keyLightRotationX: root.keyLightRotation.x,
+                keyLightRotationY: root.keyLightRotation.y,
+                keyLightRotationZ: root.keyLightRotation.z,
                 fillLightBrightness: fillLight.brightness,
                 fillLightX: root.fillLightPosition.x,
                 fillLightY: root.fillLightPosition.y,
@@ -1658,6 +1706,7 @@ ApplicationWindow {
 
         // Start with known defaults so older scene files remain predictable.
         camera.fieldOfView = 45
+        keyLightRotation = Qt.vector3d(-42, -35, 0)
         keyLight.brightness = 1.7
         fillLight.brightness = 65
         fillLightPosition = Qt.vector3d(-160, 190, 140)
@@ -1696,6 +1745,19 @@ ApplicationWindow {
             ? Math.max(-1000, Math.min(1000, Number(settings.fillLightZ))) : 140
         fillLightPosition = Qt.vector3d(fillX, fillY, fillZ)
         refreshFillLightPositionFields()
+
+        // Missing angles in older project files fall back to the original key-light direction.
+        const keyRotationX = settings.keyLightRotationX !== undefined
+                && Number.isFinite(Number(settings.keyLightRotationX))
+            ? Math.max(-180, Math.min(180, Number(settings.keyLightRotationX))) : -42
+        const keyRotationY = settings.keyLightRotationY !== undefined
+                && Number.isFinite(Number(settings.keyLightRotationY))
+            ? Math.max(-180, Math.min(180, Number(settings.keyLightRotationY))) : -35
+        const keyRotationZ = settings.keyLightRotationZ !== undefined
+                && Number.isFinite(Number(settings.keyLightRotationZ))
+            ? Math.max(-180, Math.min(180, Number(settings.keyLightRotationZ))) : 0
+        keyLightRotation = Qt.vector3d(keyRotationX, keyRotationY, keyRotationZ)
+        refreshKeyLightRotationFields()
 
         if (settings.orbitYaw !== undefined && Number.isFinite(Number(settings.orbitYaw)))
             orbitYaw = Number(settings.orbitYaw)
@@ -3277,7 +3339,7 @@ ApplicationWindow {
 
                             DirectionalLight {
                                 id: keyLight
-                                eulerRotation: Qt.vector3d(-42, -35, 0)
+                                eulerRotation: root.keyLightRotation
                                 brightness: 1.7
                                 castsShadow: true
                             }
@@ -4388,6 +4450,50 @@ ApplicationWindow {
                         value: keyLight.brightness
                         onPressedChanged: if (pressed) root.pushUndoSnapshot()
                         onMoved: keyLight.brightness = value
+                    }
+
+                    Text {
+                        visible: !root.beginnerMode
+                        Layout.fillWidth: true
+                        text: "Key light rotation (degrees)"
+                        color: root.secondaryText
+                        font.pixelSize: 10
+                    }
+
+                    GridLayout {
+                        visible: !root.beginnerMode
+                        Layout.fillWidth: true
+                        columns: 2
+                        columnSpacing: 8
+                        rowSpacing: 5
+
+                        Text { text: "X"; color: "#8f8f8f"; font.pixelSize: 11 }
+                        TextField {
+                            id: keyLightRotationXField
+                            Layout.fillWidth: true
+                            text: "-42"
+                            selectByMouse: true
+                            validator: DoubleValidator { bottom: -180; top: 180 }
+                            onEditingFinished: root.updateKeyLightRotation("x", text)
+                        }
+                        Text { text: "Y"; color: "#8f8f8f"; font.pixelSize: 11 }
+                        TextField {
+                            id: keyLightRotationYField
+                            Layout.fillWidth: true
+                            text: "-35"
+                            selectByMouse: true
+                            validator: DoubleValidator { bottom: -180; top: 180 }
+                            onEditingFinished: root.updateKeyLightRotation("y", text)
+                        }
+                        Text { text: "Z"; color: "#8f8f8f"; font.pixelSize: 11 }
+                        TextField {
+                            id: keyLightRotationZField
+                            Layout.fillWidth: true
+                            text: "0"
+                            selectByMouse: true
+                            validator: DoubleValidator { bottom: -180; top: 180 }
+                            onEditingFinished: root.updateKeyLightRotation("z", text)
+                        }
                     }
 
                     RowLayout {

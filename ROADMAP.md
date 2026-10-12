@@ -14,6 +14,7 @@ QALYVYRON is an active mainline desktop application under development. It now ha
 - [x] Add live hierarchy search by object name, shape type, and object ID, with an empty-results message.
 - [x] Add basic primitive material, camera and light controls.
 - [x] Add numeric fill-light X/Y/Z position controls, save them in scene files, and use the saved position in offline final renders.
+- [x] Add numeric directional key-light X/Y/Z rotation controls, persist their angles, and apply the same orientation in offline renders.
 - [x] Export a PNG of the viewport, labelled as a preview rather than a final render.
 - [x] Add bounded undo/redo checkpoints for common scene edits in the current implementation.
 - [x] Add Ctrl+Shift+S for Save As, F2 for renaming, Ctrl+D for duplicating the selected object, and Ctrl+Shift+F to frame visible objects.
