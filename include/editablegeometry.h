@@ -43,6 +43,8 @@ public:
     Q_INVOKABLE bool deleteFace(int faceIndex);
     // Remove a vertex and the faces connected to it; the mesh must retain at least one face.
     Q_INVOKABLE bool deleteVertex(int vertexIndex);
+    // Reverse every polygon's winding so its front-facing normal points the other way.
+    Q_INVOKABLE bool flipNormals();
     Q_INVOKABLE bool mergeVertices(int sourceIndex, int targetIndex);
     Q_INVOKABLE bool createFace(const QVariantList &vertexIndices);
     Q_INVOKABLE bool createFaceFromEdges(const QVariantList &edgeIndices);

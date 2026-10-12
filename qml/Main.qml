@@ -1508,6 +1508,23 @@ ApplicationWindow {
         setStatus("Deleted vertex " + removedIndex + " and the faces connected to it.")
     }
 
+    function flipSelectedMeshNormals() {
+        const geometry = selectedEditableGeometry()
+        if (!geometry)
+            return
+
+        const historyBefore = captureHistoryCheckpoint()
+        pushUndoSnapshot()
+        if (!geometry.flipNormals()) {
+            restoreHistoryCheckpoint(historyBefore)
+            setStatus("Normals could not be flipped because the mesh contains an invalid face.")
+            return
+        }
+
+        refreshMeshEditFields()
+        setStatus("Flipped all face normals. Undo restores the previous direction.")
+    }
+
     function mergeSelectedVertices() {
         const geometry = selectedEditableGeometry()
         if (!geometry)
@@ -2536,6 +2553,15 @@ ApplicationWindow {
                         enabled: root.selectedObject !== null && !root.selectedObject.editorImported
                         onClicked: root.deleteSelectedFace()
                     }
+                }
+
+                Button {
+                    Layout.fillWidth: true
+                    text: "Flip All Face Normals"
+                    enabled: root.selectedEditableGeometry() !== null
+                    onClicked: root.flipSelectedMeshNormals()
+                    ToolTip.visible: hovered
+                    ToolTip.text: "Reverse the winding of every face. Use this if the surface is lit from the wrong side; Undo restores it."
                 }
 
                 Text {

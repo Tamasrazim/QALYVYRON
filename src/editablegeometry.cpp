@@ -534,6 +534,31 @@ bool EditableGeometry::deleteVertex(int vertexIndex)
 }
 
 
+bool EditableGeometry::flipNormals()
+{
+    if (m_faces.isEmpty() || m_vertices.size() < 3)
+        return false;
+
+    // Validate every face first so a malformed mesh is not partially reversed.
+    QVector<QVector<int>> candidateFaces;
+    candidateFaces.reserve(m_faces.size());
+    for (const QVector<int> &originalFace : m_faces) {
+        if (!validFace(originalFace, m_vertices.size())
+            || normalForFace(originalFace).lengthSquared() < 0.5f) {
+            return false;
+        }
+
+        QVector<int> reversedFace = originalFace;
+        std::reverse(reversedFace.begin(), reversedFace.end());
+        candidateFaces.append(reversedFace);
+    }
+
+    m_faces = candidateFaces;
+    rebuildGeometry();
+    emit meshChanged();
+    return true;
+}
+
 bool EditableGeometry::mergeVertices(int sourceIndex, int targetIndex)
 {
     if (sourceIndex < 0 || sourceIndex >= m_vertices.size()

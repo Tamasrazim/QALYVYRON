@@ -31,6 +31,7 @@ private slots:
     void deleteFaceRemovesSurfaceAndCompactsVertices();
     void deleteVertexRemovesAttachedFacesAndCompactsVertices();
     void invalidVertexDeletionIsAtomic();
+    void faceNormalsCanBeFlippedAndRestored();
     void mergingAdjacentVerticesKeepsValidTopology();
     void invalidVertexMergeIsAtomic();
     void createFaceFillsDeletedCubeSurface();
@@ -443,7 +444,30 @@ void EditableGeometryTests::invalidVertexDeletionIsAtomic()
     QCOMPARE(plane.serializeMesh(), beforePlane);
 }
 
+void EditableGeometryTests::faceNormalsCanBeFlippedAndRestored()
+{
+    EditableGeometry geometry;
+    const QVariantMap originalMesh = geometry.serializeMesh();
+    QVector<QVector3D> originalNormals;
+    originalNormals.reserve(geometry.faceCount());
+    for (int faceIndex = 0; faceIndex < geometry.faceCount(); ++faceIndex)
+        originalNormals.append(geometry.faceNormal(faceIndex));
+
+    QVERIFY(geometry.flipNormals());
+    QCOMPARE(geometry.faceCount(), originalNormals.size());
+    for (int faceIndex = 0; faceIndex < geometry.faceCount(); ++faceIndex) {
+        const QVector3D flippedNormal = geometry.faceNormal(faceIndex);
+        QVERIFY(flippedNormal.length() > 0.9f);
+        QVERIFY(QVector3D::dotProduct(originalNormals.at(faceIndex), flippedNormal) < -0.99f);
+    }
+
+    // Flipping a second time restores the exact original face winding and scene data.
+    QVERIFY(geometry.flipNormals());
+    QCOMPARE(geometry.serializeMesh(), originalMesh);
+}
+
 void EditableGeometryTests::mergingAdjacentVerticesKeepsValidTopology()
+
 
 {
     EditableGeometry geometry;

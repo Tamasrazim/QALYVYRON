@@ -40,6 +40,7 @@ This stage is what separates a scene viewer from a practical 3D creation tool.
 - [x] Add single-edge subdivision that inserts a midpoint into adjacent face boundaries, with topology-budget checks and regression tests.
 - [ ] Complete interactive vertex/edge/face selection, general edge operations, advanced bevels, and non-destructive mesh operations.
 - [x] Delete a selected mesh vertex with its attached faces, compact unused vertices, and reject operations that would leave no usable faces.
+- [x] Reverse all polygon windings from the mesh editor, with an Undo action and a regression test that checks normals flip and restore.
 - [x] Add a first constrained edge-bevel operation for closed manifold edges with three connected edges at each endpoint, including width and topology regression tests.
 - [x] Add selected-object focus and approximate scene-wide framing, with the view target saved and restored in project files.
 - [x] Add a saved perspective/orthographic projection toggle; axis-aligned Front/Top/Side views use orthographic projection, and final renders use the same projection mode.
