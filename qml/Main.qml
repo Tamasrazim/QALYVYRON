@@ -1175,6 +1175,34 @@ ApplicationWindow {
         Qt.callLater(root.updateGizmo)
     }
 
+    function openCustomColorPicker() {
+        // Use the selected object's current color as the starting point.
+        if (!selectedObject || selectedIndex < 0 || selectedObject.editorImported)
+            return
+        customMaterialColorDialog.selectedColor = selectedObject.editorColor
+        customMaterialColorDialog.open()
+    }
+
+    function setMaterialCustomColor(pickedColor) {
+        if (!selectedObject || selectedIndex < 0 || selectedObject.editorImported)
+            return
+
+        // Save a six-digit color value so the exact choice survives scene save/reopen.
+        function toHexByte(component) {
+            const byteValue = Math.max(0, Math.min(255, Math.round(component * 255)))
+            return byteValue.toString(16).padStart(2, "0")
+        }
+        const hexColor = "#" + toHexByte(pickedColor.r)
+                                + toHexByte(pickedColor.g)
+                                + toHexByte(pickedColor.b)
+
+        pushUndoSnapshot()
+        selectedObject.editorColor = hexColor
+        objectList.setProperty(selectedIndex, "color", hexColor)
+        setStatus("Applied custom material color " + hexColor + " to "
+                  + selectedObject.editorLabel + ".")
+    }
+
     function setMaterialColorByIndex(index) {
         if (!selectedObject || selectedIndex < 0)
             return
@@ -2244,6 +2272,12 @@ ApplicationWindow {
                 root.setStatus("STL exported to " + result.path)
             }
         }
+    }
+
+    ColorDialog {
+        id: customMaterialColorDialog
+        title: "Choose a material color"
+        onAccepted: root.setMaterialCustomColor(selectedColor)
     }
 
     FileDialog {
@@ -3748,6 +3782,14 @@ ApplicationWindow {
                                 }
                             }
                         }
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        text: "Choose custom color…"
+                        enabled: root.selectedObject !== null
+                                 && !root.selectedObject.editorImported
+                        onClicked: root.openCustomColorPicker()
                     }
 
                     ComboBox {

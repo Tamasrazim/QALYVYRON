@@ -60,6 +60,7 @@ This stage is what separates a scene viewer from a practical 3D creation tool.
 - [x] Add configurable diffuse indirect bounces and a bounded resolution/sample/bounce workload.
 - [x] Aim the offline-render camera at the saved viewport focus target, including off-origin scenes, with regression coverage.
 - [x] Test that per-object metalness changes final-render output.
+- [x] Add a custom base-color picker that saves the chosen color into scene data and feeds both the live viewport and offline renderer.
 - [ ] Add a full PBR material editor with alpha, normal, texture inputs, and node-based material construction. A basic per-object metallic value is now available.
 - [ ] Add UV coordinates and a practical UV editing workflow.
 - [ ] Add environment and area lights, soft shadows, and a denoiser.
