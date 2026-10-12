@@ -125,7 +125,10 @@ void ProjectIOTests::importsObjAndExportsWorldTransformedMeshes()
         {QStringLiteral("rx"), 0.0},
         {QStringLiteral("ry"), 0.0},
         {QStringLiteral("rz"), 0.0},
-        {QStringLiteral("scale"), 2.0}
+        {QStringLiteral("scale"), 2.0},
+        {QStringLiteral("scaleX"), 2.0},
+        {QStringLiteral("scaleY"), 3.0},
+        {QStringLiteral("scaleZ"), 1.0}
     };
     const QVariantMap scene{
         {QStringLiteral("format"), QStringLiteral("qalyvyron.scene")},
@@ -147,6 +150,7 @@ void ProjectIOTests::importsObjAndExportsWorldTransformedMeshes()
     QVERIFY(result.contains("o Test_Quad"));
     QVERIFY(result.contains("v 10 0 0"));
     QVERIFY(result.contains("v 12 0 0"));
+    QVERIFY(result.contains("v 12 3 0"));
     QVERIFY(result.contains("f 1 2 3 4"));
 }
 
@@ -193,6 +197,9 @@ void ProjectIOTests::importsAsciiStlAndExportsWorldTransformedBinaryStl()
         {QStringLiteral("ry"), 0.0},
         {QStringLiteral("rz"), 0.0},
         {QStringLiteral("scale"), 1.0},
+        {QStringLiteral("scaleX"), 2.0},
+        {QStringLiteral("scaleY"), 3.0},
+        {QStringLiteral("scaleZ"), 1.0},
         {QStringLiteral("visible"), true}
     };
     const QVariantMap document{
@@ -218,6 +225,12 @@ void ProjectIOTests::importsAsciiStlAndExportsWorldTransformedBinaryStl()
         roundTripMesh.value(QStringLiteral("vertices")).toList().first().toList();
     QCOMPARE(firstVertex.size(), 3);
     QVERIFY(std::abs(firstVertex.at(0).toDouble() - 10.0) < 1.0e-5);
+    const QVariantList secondVertex =
+        roundTripMesh.value(QStringLiteral("vertices")).toList().at(1).toList();
+    const QVariantList thirdVertex =
+        roundTripMesh.value(QStringLiteral("vertices")).toList().at(2).toList();
+    QVERIFY(std::abs(secondVertex.at(0).toDouble() - 12.0) < 1.0e-5);
+    QVERIFY(std::abs(thirdVertex.at(1).toDouble() - 3.0) < 1.0e-5);
 }
 
 void ProjectIOTests::rejectsMalformedStl()

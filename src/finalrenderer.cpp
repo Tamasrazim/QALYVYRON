@@ -288,10 +288,15 @@ bool appendSceneTriangles(const QVariantMap &scene,
         const double rx = numberOr(object, QStringLiteral("rx"), 0.0);
         const double ry = numberOr(object, QStringLiteral("ry"), 0.0);
         const double rz = numberOr(object, QStringLiteral("rz"), 0.0);
-        const double scale = numberOr(object, QStringLiteral("scale"), 1.0);
+        const double legacyScale = numberOr(object, QStringLiteral("scale"), 1.0);
+        const double scaleX = numberOr(object, QStringLiteral("scaleX"), legacyScale);
+        const double scaleY = numberOr(object, QStringLiteral("scaleY"), legacyScale);
+        const double scaleZ = numberOr(object, QStringLiteral("scaleZ"), legacyScale);
         if (std::abs(x) > 1.0e6 || std::abs(y) > 1.0e6 || std::abs(z) > 1.0e6
             || std::abs(rx) > 1.0e6 || std::abs(ry) > 1.0e6 || std::abs(rz) > 1.0e6
-            || scale <= 0.0001 || scale > 10000.0) {
+            || scaleX <= 0.0001 || scaleX > 10000.0
+            || scaleY <= 0.0001 || scaleY > 10000.0
+            || scaleZ <= 0.0001 || scaleZ > 10000.0) {
             *error = QStringLiteral("Object '%1' has an invalid transform.")
                          .arg(object.value(QStringLiteral("label")).toString());
             return false;
@@ -334,8 +339,11 @@ bool appendSceneTriangles(const QVariantMap &scene,
             }
 
             auto worldVertex = [&](int index) {
-                return position + rotation.rotatedVector(localVertices.at(index)
-                                                           * static_cast<float>(scale));
+                QVector3D scaled = localVertices.at(index);
+            scaled.setX(scaled.x() * static_cast<float>(scaleX));
+            scaled.setY(scaled.y() * static_cast<float>(scaleY));
+            scaled.setZ(scaled.z() * static_cast<float>(scaleZ));
+            return position + rotation.rotatedVector(scaled);
             };
             const QVector3D a = worldVertex(face.first());
             for (int corner = 1; corner + 1 < face.size(); ++corner) {

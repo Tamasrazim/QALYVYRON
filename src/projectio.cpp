@@ -210,7 +210,7 @@ struct ExportObject
     QVector<QVector<int>> faces;
     QVector3D position;
     QQuaternion rotation;
-    float scale = 1.0f;
+    QVector3D scale{1.0f, 1.0f, 1.0f};
 };
 }
 
@@ -713,13 +713,17 @@ QVariantMap ProjectIO::exportObj(const QUrl &url,
         };
 
         double x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, scale = 1;
+        double scaleX = 1, scaleY = 1, scaleZ = 1;
         if (!readTransform(QStringLiteral("x"), 0, -1.0e6, 1.0e6, &x)
             || !readTransform(QStringLiteral("y"), 0, -1.0e6, 1.0e6, &y)
             || !readTransform(QStringLiteral("z"), 0, -1.0e6, 1.0e6, &z)
             || !readTransform(QStringLiteral("rx"), 0, -1.0e6, 1.0e6, &rx)
             || !readTransform(QStringLiteral("ry"), 0, -1.0e6, 1.0e6, &ry)
             || !readTransform(QStringLiteral("rz"), 0, -1.0e6, 1.0e6, &rz)
-            || !readTransform(QStringLiteral("scale"), 1, 0.0001, 10000, &scale)) {
+            || !readTransform(QStringLiteral("scale"), 1, 0.0001, 10000, &scale)
+            || !readTransform(QStringLiteral("scaleX"), scale, 0.0001, 10000, &scaleX)
+            || !readTransform(QStringLiteral("scaleY"), scale, 0.0001, 10000, &scaleY)
+            || !readTransform(QStringLiteral("scaleZ"), scale, 0.0001, 10000, &scaleZ)) {
             return failure(QStringLiteral("Scene object has an invalid transform and cannot be exported."));
         }
 
@@ -728,7 +732,9 @@ QVariantMap ProjectIO::exportObj(const QUrl &url,
         out.rotation = QQuaternion::fromEulerAngles(static_cast<float>(rx),
                                                      static_cast<float>(ry),
                                                      static_cast<float>(rz));
-        out.scale = static_cast<float>(scale);
+        out.scale = QVector3D(static_cast<float>(scaleX),
+                              static_cast<float>(scaleY),
+                              static_cast<float>(scaleZ));
         exportObjects.append(std::move(out));
     }
 
@@ -749,8 +755,11 @@ QVariantMap ProjectIO::exportObj(const QUrl &url,
     for (const ExportObject &object : exportObjects) {
         output << "\no " << object.name << "\n";
         for (const QVector3D &localVertex : object.vertices) {
+            QVector3D scaled(localVertex.x() * object.scale.x(),
+                             localVertex.y() * object.scale.y(),
+                             localVertex.z() * object.scale.z());
             const QVector3D worldVertex =
-                object.rotation.rotatedVector(localVertex * object.scale) + object.position;
+                object.rotation.rotatedVector(scaled) + object.position;
             output << "v " << QString::number(worldVertex.x(), 'g', 9) << ' '
                    << QString::number(worldVertex.y(), 'g', 9) << ' '
                    << QString::number(worldVertex.z(), 'g', 9) << "\n";
@@ -869,13 +878,17 @@ QVariantMap ProjectIO::exportStl(const QUrl &url,
         };
 
         double x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, scale = 1;
+        double scaleX = 1, scaleY = 1, scaleZ = 1;
         if (!readTransform(QStringLiteral("x"), 0, -1.0e6, 1.0e6, &x)
             || !readTransform(QStringLiteral("y"), 0, -1.0e6, 1.0e6, &y)
             || !readTransform(QStringLiteral("z"), 0, -1.0e6, 1.0e6, &z)
             || !readTransform(QStringLiteral("rx"), 0, -1.0e6, 1.0e6, &rx)
             || !readTransform(QStringLiteral("ry"), 0, -1.0e6, 1.0e6, &ry)
             || !readTransform(QStringLiteral("rz"), 0, -1.0e6, 1.0e6, &rz)
-            || !readTransform(QStringLiteral("scale"), 1, 0.0001, 10000, &scale)) {
+            || !readTransform(QStringLiteral("scale"), 1, 0.0001, 10000, &scale)
+            || !readTransform(QStringLiteral("scaleX"), scale, 0.0001, 10000, &scaleX)
+            || !readTransform(QStringLiteral("scaleY"), scale, 0.0001, 10000, &scaleY)
+            || !readTransform(QStringLiteral("scaleZ"), scale, 0.0001, 10000, &scaleZ)) {
             return failure(QStringLiteral("Scene object has an invalid transform and cannot be exported."));
         }
 
@@ -884,8 +897,11 @@ QVariantMap ProjectIO::exportStl(const QUrl &url,
                                                                   static_cast<float>(ry),
                                                                   static_cast<float>(rz));
         auto worldVertex = [&](int index) {
-            return rotation.rotatedVector(vertices.at(index) * static_cast<float>(scale))
-                + position;
+            const QVector3D local = vertices.at(index);
+            const QVector3D scaled(local.x() * static_cast<float>(scaleX),
+                                   local.y() * static_cast<float>(scaleY),
+                                   local.z() * static_cast<float>(scaleZ));
+            return rotation.rotatedVector(scaled) + position;
         };
 
         for (const QVector<int> &face : faces) {

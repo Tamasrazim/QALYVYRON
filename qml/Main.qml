@@ -440,7 +440,9 @@ ApplicationWindow {
         if (!object)
             return 80
 
-        const scale = Math.max(0.01, Number(object.uniformScale) || 1)
+        const objectScale = object.scale
+        const scale = Math.max(0.01, Math.abs(objectScale.x),
+                               Math.abs(objectScale.y), Math.abs(objectScale.z))
         let radius = 80 * scale
         const geometry = !object.editorImported ? object.geometry : null
         if (geometry && geometry.vertexCount > 0) {
@@ -595,7 +597,9 @@ ApplicationWindow {
             rxField.text = "0"
             ryField.text = "0"
             rzField.text = "0"
-            scaleField.text = "1"
+            scaleXField.text = "1"
+            scaleYField.text = "1"
+            scaleZField.text = "1"
             roughnessSlider.value = 0.38
             metalnessSlider.value = 0.08
             colorCombo.currentIndex = 0
@@ -611,7 +615,9 @@ ApplicationWindow {
         rxField.text = Number(r.x).toFixed(1)
         ryField.text = Number(r.y).toFixed(1)
         rzField.text = Number(r.z).toFixed(1)
-        scaleField.text = Number(selectedObject.uniformScale).toFixed(2)
+        scaleXField.text = Number(selectedObject.scale.x).toFixed(2)
+        scaleYField.text = Number(selectedObject.scale.y).toFixed(2)
+        scaleZField.text = Number(selectedObject.scale.z).toFixed(2)
         roughnessSlider.value = selectedObject.editorRoughness
         metalnessSlider.value = selectedObject.editorMetalness
 
@@ -642,7 +648,11 @@ ApplicationWindow {
         const rx = Number(saved.rx) || 0
         const ry = Number(saved.ry) || 0
         const rz = Number(saved.rz) || 0
-        const uniformScale = Number(saved.scale) > 0 ? Number(saved.scale) : 1
+        const legacyScale = Number(saved.scale) > 0 ? Number(saved.scale) : 1
+        const scaleX = Number(saved.scaleX) > 0 ? Number(saved.scaleX) : legacyScale
+        const scaleY = Number(saved.scaleY) > 0 ? Number(saved.scaleY) : legacyScale
+        const scaleZ = Number(saved.scaleZ) > 0 ? Number(saved.scaleZ) : legacyScale
+        const uniformScale = (scaleX + scaleY + scaleZ) / 3
         const defaultColors = ["#c8c8c8", "#508bdc", "#d8ae57", "#df5b57", "#f2f2f2"]
         const defaultColor = defaultColors[objectList.count % defaultColors.length]
         const colorValue = saved.color ? String(saved.color) : defaultColor
@@ -665,7 +675,7 @@ ApplicationWindow {
             uniformScale: uniformScale,
             position: Qt.vector3d(x, y, z),
             eulerRotation: Qt.vector3d(rx, ry, rz),
-            scale: Qt.vector3d(uniformScale, uniformScale, uniformScale),
+            scale: Qt.vector3d(scaleX, scaleY, scaleZ),
             objectName: objectId
         })
 
@@ -684,6 +694,7 @@ ApplicationWindow {
             x: x, y: y, z: z,
             rx: rx, ry: ry, rz: rz,
             scale: uniformScale,
+            scaleX: scaleX, scaleY: scaleY, scaleZ: scaleZ,
             color: colorValue,
             roughness: roughness,
             metalness: metalness,
@@ -751,7 +762,11 @@ ApplicationWindow {
         const rx = Number(saved.rx) || 0
         const ry = Number(saved.ry) || 0
         const rz = Number(saved.rz) || 0
-        const uniformScale = Number(saved.scale) > 0 ? Number(saved.scale) : 1
+        const legacyScale = Number(saved.scale) > 0 ? Number(saved.scale) : 1
+        const scaleX = Number(saved.scaleX) > 0 ? Number(saved.scaleX) : legacyScale
+        const scaleY = Number(saved.scaleY) > 0 ? Number(saved.scaleY) : legacyScale
+        const scaleZ = Number(saved.scaleZ) > 0 ? Number(saved.scaleZ) : legacyScale
+        const uniformScale = (scaleX + scaleY + scaleZ) / 3
         const objectIsVisible = saved.visible === undefined ? true : Boolean(saved.visible)
 
         const object = importedAssetComponent.createObject(sceneRoot, {
@@ -767,7 +782,7 @@ ApplicationWindow {
             assetUrl: sourceText,
             position: Qt.vector3d(x, y, z),
             eulerRotation: Qt.vector3d(rx, ry, rz),
-            scale: Qt.vector3d(uniformScale, uniformScale, uniformScale),
+            scale: Qt.vector3d(scaleX, scaleY, scaleZ),
             objectName: objectId
         })
 
@@ -786,6 +801,7 @@ ApplicationWindow {
             x: x, y: y, z: z,
             rx: rx, ry: ry, rz: rz,
             scale: uniformScale,
+            scaleX: scaleX, scaleY: scaleY, scaleZ: scaleZ,
             color: "#c8c8c8",
             roughness: 0.38,
             metalness: 0.0,
@@ -1155,11 +1171,25 @@ ApplicationWindow {
         else if (axis === "ry") ry = value
         else if (axis === "rz") rz = value
 
+        const scale = selectedObject.scale
+        let sx = scale.x, sy = scale.y, sz = scale.z
         if (axis === "scale") {
-            const scale = Math.max(0.01, Math.min(1000, value))
-            selectedObject.uniformScale = scale
-            selectedObject.scale = Qt.vector3d(scale, scale, scale)
-            objectList.setProperty(selectedIndex, "scale", scale)
+            sx = sy = sz = Math.max(0.01, Math.min(1000, value))
+        } else if (axis === "scaleX") {
+            sx = Math.max(0.01, Math.min(1000, value))
+        } else if (axis === "scaleY") {
+            sy = Math.max(0.01, Math.min(1000, value))
+        } else if (axis === "scaleZ") {
+            sz = Math.max(0.01, Math.min(1000, value))
+        }
+
+        if (axis === "scale" || axis === "scaleX" || axis === "scaleY" || axis === "scaleZ") {
+            selectedObject.scale = Qt.vector3d(sx, sy, sz)
+            selectedObject.uniformScale = (sx + sy + sz) / 3
+            objectList.setProperty(selectedIndex, "scale", selectedObject.uniformScale)
+            objectList.setProperty(selectedIndex, "scaleX", sx)
+            objectList.setProperty(selectedIndex, "scaleY", sy)
+            objectList.setProperty(selectedIndex, "scaleZ", sz)
         } else {
             selectedObject.position = Qt.vector3d(x, y, z)
             selectedObject.eulerRotation = Qt.vector3d(rx, ry, rz)
@@ -1187,7 +1217,9 @@ ApplicationWindow {
             && Math.abs(rotation.x) < 0.0001
             && Math.abs(rotation.y) < 0.0001
             && Math.abs(rotation.z) < 0.0001
-            && Math.abs(selectedObject.uniformScale - 1.0) < 0.0001
+            && Math.abs(selectedObject.scale.x - 1.0) < 0.0001
+            && Math.abs(selectedObject.scale.y - 1.0) < 0.0001
+            && Math.abs(selectedObject.scale.z - 1.0) < 0.0001
         if (alreadyReset) {
             setStatus("This object already has its default transform.")
             return
@@ -1207,6 +1239,9 @@ ApplicationWindow {
         objectList.setProperty(selectedIndex, "ry", 0)
         objectList.setProperty(selectedIndex, "rz", 0)
         objectList.setProperty(selectedIndex, "scale", 1)
+        objectList.setProperty(selectedIndex, "scaleX", 1)
+        objectList.setProperty(selectedIndex, "scaleY", 1)
+        objectList.setProperty(selectedIndex, "scaleZ", 1)
 
         // Refocus the view so the object doesn't appear to vanish after a reset.
         focusTarget.position = Qt.vector3d(0, 0, 0)
@@ -1296,6 +1331,7 @@ ApplicationWindow {
             ry: row.ry,
             rz: row.rz,
             scale: row.scale,
+            scaleX: row.scaleX, scaleY: row.scaleY, scaleZ: row.scaleZ,
             color: row.color,
             roughness: row.roughness,
             metalness: row.metalness
@@ -1392,6 +1428,9 @@ ApplicationWindow {
                 x: row.x, y: row.y, z: row.z,
                 rx: row.rx, ry: row.ry, rz: row.rz,
                 scale: row.scale,
+                scaleX: row.scaleX === undefined ? row.scale : row.scaleX,
+                scaleY: row.scaleY === undefined ? row.scale : row.scaleY,
+                scaleZ: row.scaleZ === undefined ? row.scale : row.scaleZ,
                 color: row.color,
                 roughness: row.roughness,
                 metalness: row.metalness,
@@ -3718,22 +3757,46 @@ ApplicationWindow {
                         }
                     }
 
-                    RowLayout {
+                    Text {
+                        visible: !root.beginnerMode
+                        text: "Scale (independent axes)"
+                        color: root.secondaryText
+                        font.pixelSize: 10
+                    }
+
+                    GridLayout {
                         visible: !root.beginnerMode
                         Layout.fillWidth: true
-                        Text {
-                            text: "Uniform scale"
-                            color: root.secondaryText
-                            font.pixelSize: 10
-                        }
-                        Item { Layout.fillWidth: true }
+                        columns: 2
+                        columnSpacing: 8
+                        rowSpacing: 6
+
+                        Text { text: "X"; color: "#8f8f8f"; font.pixelSize: 11 }
                         TextField {
-                            id: scaleField
-                            Layout.preferredWidth: 92
+                            id: scaleXField
+                            Layout.fillWidth: true
                             text: "1"
                             selectByMouse: true
                             validator: DoubleValidator { bottom: 0.01; top: 1000 }
-                            onEditingFinished: root.updateTransform("scale", text)
+                            onEditingFinished: root.updateTransform("scaleX", text)
+                        }
+                        Text { text: "Y"; color: "#8f8f8f"; font.pixelSize: 11 }
+                        TextField {
+                            id: scaleYField
+                            Layout.fillWidth: true
+                            text: "1"
+                            selectByMouse: true
+                            validator: DoubleValidator { bottom: 0.01; top: 1000 }
+                            onEditingFinished: root.updateTransform("scaleY", text)
+                        }
+                        Text { text: "Z"; color: "#8f8f8f"; font.pixelSize: 11 }
+                        TextField {
+                            id: scaleZField
+                            Layout.fillWidth: true
+                            text: "1"
+                            selectByMouse: true
+                            validator: DoubleValidator { bottom: 0.01; top: 1000 }
+                            onEditingFinished: root.updateTransform("scaleZ", text)
                         }
                     }
 
@@ -3771,8 +3834,12 @@ ApplicationWindow {
                             const scale = Math.max(0.25, Math.min(3, value))
                             root.selectedObject.uniformScale = scale
                             root.selectedObject.scale = Qt.vector3d(scale, scale, scale)
-                            if (root.selectedIndex >= 0)
+                            if (root.selectedIndex >= 0) {
                                 objectList.setProperty(root.selectedIndex, "scale", scale)
+                                objectList.setProperty(root.selectedIndex, "scaleX", scale)
+                                objectList.setProperty(root.selectedIndex, "scaleY", scale)
+                                objectList.setProperty(root.selectedIndex, "scaleZ", scale)
+                            }
                             root.refreshInspector()
                         }
                     }

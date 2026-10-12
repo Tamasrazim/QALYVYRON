@@ -34,8 +34,9 @@ This stage is what separates a scene viewer from a practical 3D creation tool.
 - [ ] Implement interactive vertex/edge/face selection, edge operations, bevel, merge, delete, face creation, and non-destructive mesh operations.
 - [x] Add selected-object focus and approximate scene-wide framing, with the view target saved and restored in project files.
 - [x] Add optional world-grid snapping for viewport object dragging, with selectable step sizes.
-- [x] Provide numeric position, rotation, and uniform-scale fields for the selected object.
+- [x] Provide numeric position, rotation, uniform-scale controls in simple view, and independent X/Y/Z scale fields in advanced view.
 - [x] Add a one-click reset for object position, rotation, and scale, with undo and automatic refocusing.
+- [x] Add independent X/Y/Z object scaling, saved in scene files and baked into CPU final renders plus OBJ/STL exports.
 - [x] Add draggable X/Y/Z world-axis handles to constrain object movement in the viewport.
 - [ ] Add pivot modes and fully reliable modeling selection.
 - [ ] Add subdivision and non-destructive modifier stacks with editable parameters.
