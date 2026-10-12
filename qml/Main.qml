@@ -1175,6 +1175,47 @@ ApplicationWindow {
         Qt.callLater(root.updateGizmo)
     }
 
+    function resetSelectedTransform() {
+        if (!selectedObject || selectedIndex < 0)
+            return
+
+        const position = selectedObject.position
+        const rotation = selectedObject.eulerRotation
+        const alreadyReset = Math.abs(position.x) < 0.0001
+            && Math.abs(position.y) < 0.0001
+            && Math.abs(position.z) < 0.0001
+            && Math.abs(rotation.x) < 0.0001
+            && Math.abs(rotation.y) < 0.0001
+            && Math.abs(rotation.z) < 0.0001
+            && Math.abs(selectedObject.uniformScale - 1.0) < 0.0001
+        if (alreadyReset) {
+            setStatus("This object already has its default transform.")
+            return
+        }
+
+        // Save the previous scene once so Undo restores the old object transform.
+        pushUndoSnapshot()
+        selectedObject.position = Qt.vector3d(0, 0, 0)
+        selectedObject.eulerRotation = Qt.vector3d(0, 0, 0)
+        selectedObject.uniformScale = 1.0
+        selectedObject.scale = Qt.vector3d(1, 1, 1)
+
+        objectList.setProperty(selectedIndex, "x", 0)
+        objectList.setProperty(selectedIndex, "y", 0)
+        objectList.setProperty(selectedIndex, "z", 0)
+        objectList.setProperty(selectedIndex, "rx", 0)
+        objectList.setProperty(selectedIndex, "ry", 0)
+        objectList.setProperty(selectedIndex, "rz", 0)
+        objectList.setProperty(selectedIndex, "scale", 1)
+
+        // Refocus the view so the object doesn't appear to vanish after a reset.
+        focusTarget.position = Qt.vector3d(0, 0, 0)
+        updateCamera()
+        refreshInspector()
+        Qt.callLater(root.updateGizmo)
+        setStatus("Reset position, rotation, and scale for " + selectedObject.editorLabel + ".")
+    }
+
     function openCustomColorPicker() {
         // Use the selected object's current color as the starting point.
         if (!selectedObject || selectedIndex < 0 || selectedObject.editorImported)
@@ -3689,6 +3730,16 @@ ApplicationWindow {
                             validator: DoubleValidator { bottom: 0.01; top: 1000 }
                             onEditingFinished: root.updateTransform("scale", text)
                         }
+                    }
+
+                    Button {
+                        visible: !root.beginnerMode
+                        Layout.fillWidth: true
+                        text: "Reset Transform"
+                        enabled: root.selectedObject !== null
+                        onClicked: root.resetSelectedTransform()
+                        ToolTip.visible: hovered
+                        ToolTip.text: "Move the object to the origin, clear rotation, and restore scale to 1."
                     }
 
                     Text {
