@@ -864,10 +864,10 @@ ApplicationWindow {
     }
 
     function createNewScene() {
-        if (editorReady)
-            pushUndoSnapshot()
-
+        // A new document starts a fresh history. Undo must never jump back into
+        // the previous document after the user has confirmed replacing it.
         currentProjectUrl = ""
+        clearHistory()
         clearScene()
         addPrimitive("Cube", {id: "object-1", label: "Cube", x: 0, y: 0, z: 0, scale: 1, color: "#c8c8c8"})
         orbitYaw = 34
@@ -879,6 +879,7 @@ ApplicationWindow {
         fillLight.color = "#ffffff"
         fillTintCombo.currentIndex = 0
         updateCamera()
+        projectDirty = editorReady
         setStatus("New scene ready.")
     }
 
