@@ -971,11 +971,14 @@ void FinalRenderer::runRender(QString outputPath,
                 numberOr(settings, QStringLiteral("fillLightZ"), 140.0), -1000.0, 1000.0)));
         const int fillTintIndex = static_cast<int>(std::clamp(
             numberOr(settings, QStringLiteral("fillTintIndex"), 0.0), 0.0, 2.0));
-        const QVector3D fillTint = fillTintIndex == 1
+        const QVector3D presetFillTint = fillTintIndex == 1
             ? colorToLinear(QColor(QStringLiteral("#ffd6ad")))
             : fillTintIndex == 2
                 ? colorToLinear(QColor(QStringLiteral("#b8d6ff")))
                 : QVector3D(1.0f, 1.0f, 1.0f);
+        const QColor savedFillColor(settings.value(QStringLiteral("fillLightColor")).toString());
+        const QVector3D fillTint = savedFillColor.isValid()
+            ? colorToLinear(savedFillColor) : presetFillTint;
         const QVector3D background = colorToLinear(QColor(QStringLiteral("#171717")));
 
         QImage image(width, height, QImage::Format_ARGB32);

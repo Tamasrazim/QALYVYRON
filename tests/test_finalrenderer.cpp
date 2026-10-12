@@ -74,6 +74,7 @@ private slots:
     void smoothShadingChangesFinalRenderAppearance();
     void keyLightRotationChangesFinalRenderAppearance();
     void fillLightPositionChangesFinalRenderAppearance();
+    void fillLightColorChangesFinalRenderAppearance();
     void orthographicProjectionChangesFinalRender();
     void writesPngFromSceneGeometry();
 };
@@ -315,7 +316,63 @@ void FinalRendererTests::keyLightRotationChangesFinalRenderAppearance()
     QVERIFY(!renderer.busy());
 }
 
+void FinalRendererTests::fillLightColorChangesFinalRenderAppearance()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    auto sceneWithFillColor = [](const QString &color) {
+        QVariantMap scene = smallPlaneScene();
+        QVariantMap settings = scene.value(QStringLiteral("settings")).toMap();
+        settings.insert(QStringLiteral("fillLightX"), -160.0);
+        settings.insert(QStringLiteral("fillLightY"), 190.0);
+        settings.insert(QStringLiteral("fillLightZ"), 140.0);
+        settings.insert(QStringLiteral("fillLightBrightness"), 150.0);
+        settings.insert(QStringLiteral("fillLightColor"), color);
+        scene.insert(QStringLiteral("settings"), settings);
+        return scene;
+    };
+
+    FinalRenderer renderer;
+    QSignalSpy finished(&renderer, &FinalRenderer::renderFinished);
+    QVERIFY(finished.isValid());
+
+    const QString redPath = directory.filePath(QStringLiteral("fill-light-red.png"));
+    QVERIFY(renderer.startRender(QUrl::fromLocalFile(redPath),
+                                 sceneWithFillColor(QStringLiteral("#ff2020")), 64, 64, 2, 0));
+    QTRY_VERIFY_WITH_TIMEOUT(!finished.isEmpty(), 10000);
+    const QList<QVariant> redResult = finished.takeFirst();
+    QVERIFY2(redResult.at(0).toBool(), qPrintable(redResult.at(1).toString()));
+    const QImage redImage(redPath);
+    QVERIFY(!redImage.isNull());
+
+    const QString bluePath = directory.filePath(QStringLiteral("fill-light-blue.png"));
+    QVERIFY(renderer.startRender(QUrl::fromLocalFile(bluePath),
+                                 sceneWithFillColor(QStringLiteral("#2040ff")), 64, 64, 2, 0));
+    QTRY_VERIFY_WITH_TIMEOUT(!finished.isEmpty(), 10000);
+    const QList<QVariant> blueResult = finished.takeFirst();
+    QVERIFY2(blueResult.at(0).toBool(), qPrintable(blueResult.at(1).toString()));
+    const QImage blueImage(bluePath);
+    QVERIFY(!blueImage.isNull());
+
+    qint64 totalPixelDifference = 0;
+    for (int y = 0; y < redImage.height(); ++y) {
+        const auto *redRow = reinterpret_cast<const QRgb *>(redImage.constScanLine(y));
+        const auto *blueRow = reinterpret_cast<const QRgb *>(blueImage.constScanLine(y));
+        for (int x = 0; x < redImage.width(); ++x) {
+            totalPixelDifference += std::abs(qRed(redRow[x]) - qRed(blueRow[x]));
+            totalPixelDifference += std::abs(qGreen(redRow[x]) - qGreen(blueRow[x]));
+            totalPixelDifference += std::abs(qBlue(redRow[x]) - qBlue(blueRow[x]));
+        }
+    }
+
+    QVERIFY2(totalPixelDifference > 100,
+             "A custom fill-light color must affect final render pixels.");
+    QVERIFY(!renderer.busy());
+}
+
 void FinalRendererTests::fillLightPositionChangesFinalRenderAppearance()
+
 
 {
     QTemporaryDir directory;

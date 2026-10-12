@@ -48,6 +48,8 @@ ApplicationWindow {
     property bool orthographicMode: false
     // The fill light uses one saved position for the viewport and final renderer.
     property vector3d fillLightPosition: Qt.vector3d(-160, 190, 140)
+    // Keep the fill-light colour in one place so viewport and final-render colours agree.
+    property color fillLightColor: "#ffffff"
     // Euler angles define the key-light direction in both the viewport and final renderer.
     property vector3d keyLightRotation: Qt.vector3d(-42, -35, 0)
     property real gizmoX: 0
@@ -339,6 +341,65 @@ ApplicationWindow {
         if (shape === "Cone") return "#Cone"
         if (shape === "Plane") return "#Rectangle"
         return "#Cube"
+    }
+
+    function refreshFillTintSelection() {
+        const currentColor = String(fillLightColor).toLowerCase()
+        if (currentColor === "#ffffff")
+            fillTintCombo.currentIndex = 0
+        else if (currentColor === "#ffd6ad")
+            fillTintCombo.currentIndex = 1
+        else if (currentColor === "#b8d6ff")
+            fillTintCombo.currentIndex = 2
+        else
+            fillTintCombo.currentIndex = 3
+    }
+
+    function openCustomFillLightColorPicker() {
+        customFillLightColorDialog.selectedColor = fillLightColor
+        customFillLightColorDialog.open()
+    }
+
+    function setCustomFillLightColor(pickedColor) {
+        // Store a predictable six-digit value, so colour choices survive JSON save/reopen.
+        function toHexByte(component) {
+            const byteValue = Math.max(0, Math.min(255, Math.round(component * 255)))
+            return byteValue.toString(16).padStart(2, "0")
+        }
+        const hexColor = "#" + toHexByte(pickedColor.r)
+                               + toHexByte(pickedColor.g)
+                               + toHexByte(pickedColor.b)
+        if (String(fillLightColor).toLowerCase() === hexColor
+                && fillTintCombo.currentIndex === 3) {
+            refreshFillTintSelection()
+            return
+        }
+
+        pushUndoSnapshot()
+        fillLightColor = hexColor
+        fillTintCombo.currentIndex = 3
+        setStatus("Updated custom fill-light colour " + hexColor + ".")
+    }
+
+    function applyFillLightTint(index) {
+        if (index === 3) {
+            openCustomFillLightColorPicker()
+            return
+        }
+
+        const presetColors = ["#ffffff", "#ffd6ad", "#b8d6ff"]
+        if (index < 0 || index >= presetColors.length)
+            return
+        const presetColor = presetColors[index]
+        if (String(fillLightColor).toLowerCase() === presetColor) {
+            refreshFillTintSelection()
+            return
+        }
+
+        pushUndoSnapshot()
+        fillLightColor = presetColor
+        fillTintCombo.currentIndex = index
+        setStatus("Updated fill-light colour.")
     }
 
     // Refresh the numeric light fields after opening, resetting, undoing, or redoing a scene.
@@ -1629,10 +1690,11 @@ ApplicationWindow {
         keyLight.brightness = 1.7
         fillLight.brightness = 65
         fillLightPosition = Qt.vector3d(-160, 190, 140)
-        fillLight.color = "#ffffff"
+        fillLightColor = "#ffffff"
         fillTintCombo.currentIndex = 0
         refreshFillLightPositionFields()
         refreshKeyLightRotationFields()
+        refreshFillTintSelection()
         updateCamera()
         projectDirty = editorReady
         setStatus("New scene ready.")
@@ -1687,6 +1749,7 @@ ApplicationWindow {
                 fillLightY: root.fillLightPosition.y,
                 fillLightZ: root.fillLightPosition.z,
                 fillTintIndex: fillTintCombo.currentIndex,
+                fillLightColor: String(root.fillLightColor),
                 orbitYaw: root.orbitYaw,
                 orbitPitch: root.orbitPitch,
                 orbitDistance: root.orbitDistance,
@@ -1710,7 +1773,7 @@ ApplicationWindow {
         keyLight.brightness = 1.7
         fillLight.brightness = 65
         fillLightPosition = Qt.vector3d(-160, 190, 140)
-        fillLight.color = "#ffffff"
+        fillLightColor = "#ffffff"
         fillTintCombo.currentIndex = 0
         refreshFillLightPositionFields()
         orbitYaw = 34
@@ -1729,12 +1792,19 @@ ApplicationWindow {
             const tintIndex = Math.max(0, Math.min(2, Number(settings.fillTintIndex) || 0))
             fillTintCombo.currentIndex = tintIndex
             if (tintIndex === 1)
-                fillLight.color = "#ffd6ad"
+                fillLightColor = "#ffd6ad"
             else if (tintIndex === 2)
-                fillLight.color = "#b8d6ff"
+                fillLightColor = "#b8d6ff"
             else
-                fillLight.color = "#ffffff"
+                fillLightColor = "#ffffff"
         }
+
+        // Only accept a stored RGB hex value; old scenes continue to use their named preset.
+        const savedFillColor = settings.fillLightColor === undefined
+            ? "" : String(settings.fillLightColor)
+        if (/^#[0-9a-f]{6}$/i.test(savedFillColor))
+            fillLightColor = savedFillColor
+        refreshFillTintSelection()
 
         // Older scenes don't store the light position, so keep the old default for them.
         const fillX = settings.fillLightX !== undefined && Number.isFinite(Number(settings.fillLightX))
@@ -2651,6 +2721,13 @@ ApplicationWindow {
         onAccepted: root.setMaterialCustomColor(selectedColor)
     }
 
+    ColorDialog {
+        id: customFillLightColorDialog
+        title: "Choose a fill-light colour"
+        onAccepted: root.setCustomFillLightColor(selectedColor)
+        onRejected: root.refreshFillTintSelection()
+    }
+
     FileDialog {
         id: exportImageDialog
         title: "Export Viewport Preview"
@@ -3348,7 +3425,7 @@ ApplicationWindow {
                                 id: fillLight
                                 position: root.fillLightPosition
                                 brightness: 65
-                                color: "#ffffff"
+                                color: root.fillLightColor
                                 quadraticFade: 0.00008
                             }
 
@@ -4552,16 +4629,8 @@ ApplicationWindow {
                         id: fillTintCombo
                         visible: !root.beginnerMode
                         Layout.fillWidth: true
-                        model: ["Neutral fill", "Warm fill", "Cool fill"]
-                        onActivated: {
-                            root.pushUndoSnapshot()
-                            if (currentIndex === 0)
-                                fillLight.color = "#ffffff"
-                            else if (currentIndex === 1)
-                                fillLight.color = "#ffd6ad"
-                            else
-                                fillLight.color = "#b8d6ff"
-                        }
+                        model: ["Neutral fill", "Warm fill", "Cool fill", "Custom…"]
+                        onActivated: root.applyFillLightTint(currentIndex)
                     }
 
                     Rectangle {
