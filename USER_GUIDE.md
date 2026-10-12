@@ -8,7 +8,7 @@ The first launch opens a welcome screen. Choose **Start creating** to enter the 
 
 A new scene starts with one cube so there is only one thing to focus on. Use **Add a Shape** to add a cube, ball, cylinder, cone, or plane. Use **Your Objects** to select a shape, rename it, copy it, or remove it.
 
-**Simple view** is enabled by default. It shows color and size controls and keeps detailed numeric transforms, lighting, camera, roughness, and mesh-editing tools out of the way. Click **Show all tools** at the top when you need more control. Click **Simple view** to return to the beginner layout.
+**Simple view** is enabled by default. It shows six clickable color swatches and a size slider, while keeping detailed numeric transforms, lighting, camera, roughness, and mesh-editing tools out of the way. Hover over a color to see its name. Click **Show all tools** at the top when you need more control. Click **Simple view** to return to the beginner layout.
 
 ## Navigate the viewport
 

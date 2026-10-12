@@ -2790,13 +2790,57 @@ ApplicationWindow {
                     }
 
                     Text {
-                        text: "Base color"
+                        text: root.beginnerMode ? "Color" : "Base color"
                         color: root.secondaryText
                         font.pixelSize: 10
                     }
 
+                    RowLayout {
+                        visible: root.beginnerMode
+                        Layout.fillWidth: true
+                        spacing: 5
+
+                        Repeater {
+                            model: [
+                                {name: "Silver", value: "#c8c8c8"},
+                                {name: "White", value: "#f2f2f2"},
+                                {name: "Graphite", value: "#555555"},
+                                {name: "Red", value: "#df5b57"},
+                                {name: "Blue", value: "#508bdc"},
+                                {name: "Gold", value: "#d8ae57"}
+                            ]
+
+                            delegate: Rectangle {
+                                required property var modelData
+                                required property int index
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: 1
+                                Layout.preferredHeight: 31
+                                radius: 4
+                                color: modelData.value
+                                border.width: root.selectedObject
+                                             && String(root.selectedObject.editorColor).toLowerCase()
+                                                === modelData.value ? 3 : 1
+                                border.color: root.selectedObject
+                                               && String(root.selectedObject.editorColor).toLowerCase()
+                                                  === modelData.value ? "#ffffff" : "#454545"
+                                ToolTip.visible: swatchMouse.containsMouse
+                                ToolTip.text: modelData.name
+
+                                MouseArea {
+                                    id: swatchMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.setMaterialColorByIndex(index)
+                                }
+                            }
+                        }
+                    }
+
                     ComboBox {
                         id: colorCombo
+                        visible: !root.beginnerMode
                         Layout.fillWidth: true
                         enabled: root.selectedObject !== null && !root.selectedObject.editorImported
                         model: ["Silver", "White", "Graphite", "Red", "Blue", "Gold"]
