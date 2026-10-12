@@ -1,5 +1,6 @@
 #include "projectio.h"
 
+#include <QCoreApplication>
 #include <QFile>
 #include <QSettings>
 #include <QTemporaryDir>
@@ -171,21 +172,18 @@ void ProjectIOTests::remembersWelcomePreference()
 {
     ProjectIO io;
     QSettings settings;
-    const QString key = QStringLiteral("interface/welcomeSeen");
+    const QString key = QStringLiteral("interface/showWelcomeOnStartup");
     const bool hadPreviousValue = settings.contains(key);
     const QVariant previousValue = settings.value(key);
 
     settings.remove(key);
     settings.sync();
-    QVERIFY(!io.welcomeChoiceMade());
-    QVERIFY(!io.hasSeenWelcome());
+    QVERIFY(io.showWelcomeOnStartup());
 
-    io.setHasSeenWelcome(true);
-    QVERIFY(io.welcomeChoiceMade());
-    QVERIFY(io.hasSeenWelcome());
-    io.setHasSeenWelcome(false);
-    QVERIFY(io.welcomeChoiceMade());
-    QVERIFY(!io.hasSeenWelcome());
+    io.setShowWelcomeOnStartup(false);
+    QVERIFY(!io.showWelcomeOnStartup());
+    io.setShowWelcomeOnStartup(true);
+    QVERIFY(io.showWelcomeOnStartup());
 
     if (hadPreviousValue)
         settings.setValue(key, previousValue);
@@ -211,5 +209,12 @@ void ProjectIOTests::rejectsMalformedJson()
     QVERIFY(!result.value(QStringLiteral("error")).toString().isEmpty());
 }
 
-QTEST_GUILESS_MAIN(ProjectIOTests)
+int main(int argc, char *argv[])
+{
+    QCoreApplication application(argc, argv);
+    QCoreApplication::setApplicationName(QStringLiteral("QALYVYRON-tests"));
+    QCoreApplication::setOrganizationName(QStringLiteral("Tamasrazim"));
+    ProjectIOTests tests;
+    return QTest::qExec(&tests, argc, argv);
+}
 #include "test_projectio.moc"

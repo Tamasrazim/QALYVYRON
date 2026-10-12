@@ -4,7 +4,7 @@ This guide covers the current mainline application. Remaining feature gaps are l
 
 ## Start a scene
 
-The first launch opens a welcome screen. Choose **Start creating** to enter the workspace, **Take the quick tour** to learn the basics, or **Import a model** to open a local asset. The checkbox remembers whether the screen should appear at startup.
+The first launch opens a welcome screen. Choose **Start creating** to enter the workspace, **Take the quick tour** to learn the basics, or **Import a model** to open a local asset. Check **Don't show this screen when I launch QALYVYRON** to keep it closed on later launches; uncheck it to show the welcome screen again.
 
 A new scene starts with one cube so there is only one thing to focus on. Use **Add a Shape** to add a cube, ball, cylinder, cone, or plane. Use **Your Objects** to select a shape, rename it, copy it, or remove it.
 

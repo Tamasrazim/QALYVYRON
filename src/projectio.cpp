@@ -211,22 +211,16 @@ ProjectIO::ProjectIO(QObject *parent)
 {
 }
 
-bool ProjectIO::hasSeenWelcome() const
+bool ProjectIO::showWelcomeOnStartup() const
 {
     const QSettings settings;
-    return settings.value(QStringLiteral("interface/welcomeSeen"), false).toBool();
+    return settings.value(QStringLiteral("interface/showWelcomeOnStartup"), true).toBool();
 }
 
-bool ProjectIO::welcomeChoiceMade() const
-{
-    const QSettings settings;
-    return settings.contains(QStringLiteral("interface/welcomeSeen"));
-}
-
-void ProjectIO::setHasSeenWelcome(bool seen) const
+void ProjectIO::setShowWelcomeOnStartup(bool show) const
 {
     QSettings settings;
-    settings.setValue(QStringLiteral("interface/welcomeSeen"), seen);
+    settings.setValue(QStringLiteral("interface/showWelcomeOnStartup"), show);
     settings.sync();
 }
 

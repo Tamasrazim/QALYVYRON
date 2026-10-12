@@ -1536,7 +1536,7 @@ ApplicationWindow {
         x: (root.width - width) / 2
         y: (root.height - height) / 2
         standardButtons: Dialog.NoButton
-        onClosed: projectIO.setHasSeenWelcome(rememberWelcomeCheck.checked)
+        onClosed: projectIO.setShowWelcomeOnStartup(!rememberWelcomeCheck.checked)
 
         background: Rectangle {
             color: "#111111"
@@ -3019,9 +3019,8 @@ ApplicationWindow {
         createNewScene()
         editorReady = true
         clearHistory()
-        rememberWelcomeCheck.checked = !projectIO.welcomeChoiceMade()
-                                            || projectIO.hasSeenWelcome()
-        if (!projectIO.hasSeenWelcome())
+        rememberWelcomeCheck.checked = !projectIO.showWelcomeOnStartup()
+        if (projectIO.showWelcomeOnStartup())
             Qt.callLater(introDialog.open)
     }
 }
