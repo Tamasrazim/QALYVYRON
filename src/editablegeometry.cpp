@@ -457,6 +457,82 @@ bool EditableGeometry::deleteFace(int faceIndex)
     emit meshChanged();
     return true;
 }
+bool EditableGeometry::deleteVertex(int vertexIndex)
+{
+    if (vertexIndex < 0 || vertexIndex >= m_vertices.size())
+        return false;
+
+    // Remove every face using this vertex. Work in temporary arrays so a
+    // rejected deletion never damages the currently displayed mesh.
+    QVector<QVector<int>> remainingFaces;
+    remainingFaces.reserve(m_faces.size());
+    for (const QVector<int> &face : m_faces) {
+        for (const int index : face) {
+            if (index < 0 || index >= m_vertices.size())
+                return false;
+        }
+        if (!face.contains(vertexIndex))
+            remainingFaces.append(face);
+    }
+
+    // Never turn an object into an empty shell with no faces.
+    if (remainingFaces.isEmpty())
+        return false;
+
+    QVector<bool> used(m_vertices.size(), false);
+    for (const QVector<int> &face : remainingFaces) {
+        for (const int index : face) {
+            if (index == vertexIndex || index < 0 || index >= m_vertices.size())
+                return false;
+            used[index] = true;
+        }
+    }
+
+    // Compact both the deleted point and any other vertices no surviving face uses.
+    QVector<int> remap(m_vertices.size(), -1);
+    QVector<QVector3D> compactVertices;
+    compactVertices.reserve(m_vertices.size() - 1);
+    for (int oldIndex = 0; oldIndex < m_vertices.size(); ++oldIndex) {
+        if (!used.at(oldIndex))
+            continue;
+        remap[oldIndex] = compactVertices.size();
+        compactVertices.append(m_vertices.at(oldIndex));
+    }
+    if (compactVertices.size() < 3)
+        return false;
+
+    for (QVector<int> &face : remainingFaces) {
+        for (int &index : face) {
+            if (index < 0 || index >= remap.size() || remap.at(index) < 0)
+                return false;
+            index = remap.at(index);
+        }
+        if (!validFace(face, compactVertices.size()))
+            return false;
+
+        // A face left behind by the deletion must still have a usable surface normal.
+        QVector3D normal;
+        for (int i = 0; i < face.size(); ++i) {
+            const QVector3D &a = compactVertices.at(face.at(i));
+            const QVector3D &b = compactVertices.at(face.at((i + 1) % face.size()));
+            normal.setX(normal.x() + (a.y() - b.y()) * (a.z() + b.z()));
+            normal.setY(normal.y() + (a.z() - b.z()) * (a.x() + b.x()));
+            normal.setZ(normal.z() + (a.x() - b.x()) * (a.y() + b.y()));
+        }
+        if (!finiteVector(normal) || normal.lengthSquared() < kEpsilon * kEpsilon)
+            return false;
+    }
+
+    // Commit once the remaining topology has passed validation.
+    m_vertices = compactVertices;
+    m_faces = remainingFaces;
+    m_shape = QStringLiteral("Custom");
+    rebuildGeometry();
+    emit shapeChanged();
+    emit meshChanged();
+    return true;
+}
+
 
 bool EditableGeometry::mergeVertices(int sourceIndex, int targetIndex)
 {

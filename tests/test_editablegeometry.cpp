@@ -29,6 +29,8 @@ private slots:
     void insettingFaceAddsInnerCapAndRing();
     void invalidInsetIsAtomic();
     void deleteFaceRemovesSurfaceAndCompactsVertices();
+    void deleteVertexRemovesAttachedFacesAndCompactsVertices();
+    void invalidVertexDeletionIsAtomic();
     void mergingAdjacentVerticesKeepsValidTopology();
     void invalidVertexMergeIsAtomic();
     void createFaceFillsDeletedCubeSurface();
@@ -396,7 +398,53 @@ void EditableGeometryTests::deleteFaceRemovesSurfaceAndCompactsVertices()
     QVERIFY(!cube.deleteFace(cube.faceCount()));
 }
 
+void EditableGeometryTests::deleteVertexRemovesAttachedFacesAndCompactsVertices()
+{
+    EditableGeometry geometry;
+    const QVector3D removedPosition = geometry.vertexPosition(0);
+
+    QVERIFY(geometry.deleteVertex(0));
+    QCOMPARE(geometry.vertexCount(), 7);
+    QCOMPARE(geometry.faceCount(), 3);
+    QCOMPARE(geometry.shape(), QStringLiteral("Custom"));
+
+    bool stillContainsRemovedPosition = false;
+    for (int index = 0; index < geometry.vertexCount(); ++index) {
+        if (geometry.vertexPosition(index) == removedPosition)
+            stillContainsRemovedPosition = true;
+    }
+    QVERIFY(!stillContainsRemovedPosition);
+
+    const QVariantList faces = geometry.serializeMesh().value(QStringLiteral("faces")).toList();
+    for (const QVariant &rawFace : faces) {
+        const QVariantList face = rawFace.toList();
+        QVERIFY(face.size() >= 3);
+        for (const QVariant &rawIndex : face) {
+            const int index = rawIndex.toInt();
+            QVERIFY(index >= 0 && index < geometry.vertexCount());
+        }
+    }
+    for (int faceIndex = 0; faceIndex < geometry.faceCount(); ++faceIndex)
+        QVERIFY(geometry.faceNormal(faceIndex).length() > 0.9f);
+}
+
+void EditableGeometryTests::invalidVertexDeletionIsAtomic()
+{
+    EditableGeometry cube;
+    const QVariantMap beforeCube = cube.serializeMesh();
+    QVERIFY(!cube.deleteVertex(-1));
+    QVERIFY(!cube.deleteVertex(cube.vertexCount()));
+    QCOMPARE(cube.serializeMesh(), beforeCube);
+
+    EditableGeometry plane;
+    plane.setShape(QStringLiteral("Plane"));
+    const QVariantMap beforePlane = plane.serializeMesh();
+    QVERIFY(!plane.deleteVertex(0)); // Removing it would also remove the only face.
+    QCOMPARE(plane.serializeMesh(), beforePlane);
+}
+
 void EditableGeometryTests::mergingAdjacentVerticesKeepsValidTopology()
+
 {
     EditableGeometry geometry;
     const QVector3D targetPosition = geometry.vertexPosition(1);

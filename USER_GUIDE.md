@@ -35,10 +35,11 @@ Select a cube, sphere, cylinder, cone, or plane, then click **Edit Selected Mesh
 2. **Face extrusion:** click a face-center marker or choose its index, enter a non-zero distance, and click **Extrude Face**. A new cap and side faces are added to the mesh.
 3. **Face inset:** select a convex planar face, enter a positive inset distance, and click **Inset Face**. The selected face is shrunk by offsetting its edges and adding a surrounding ring. Excessive insets and non-convex or warped faces are rejected.
 4. **Delete face:** choose a face marker and click **Delete Face**. The face is removed and unused vertices are compacted. QALYVYRON prevents deleting the final face of an object; use Undo if you remove the wrong surface.
+5. **Delete vertex and connected faces:** select a vertex and click **Delete Vertex + Connected Faces**. The vertex and all faces attached to it are removed, unused points are compacted, and remaining faces are validated. The final face cannot be removed; Undo restores a successful deletion.
 
 The vertex and face indices are shown as zero-based values. The editor also displays the selected face's center and normal. Mesh data is stored in the scene file, restored when the project opens, and included when you duplicate a built-in mesh. Undo and redo checkpoints include the mesh topology.
 
-This mesh workspace supports vertex and face-center selection, ordered vertex multi-selection for face creation, merge vertices, vertex-coordinate editing, face extrusion and inset, face deletion, edge subdivision and a constrained **Bevel Edge** operation. The first bevel version works on closed mesh edges whose endpoints each connect to three edges; try a smaller width if the tool rejects an edge.
+This mesh workspace supports vertex and face-center selection, ordered vertex multi-selection for face creation, merge vertices, vertex-coordinate editing, face extrusion and inset, face deletion, vertex deletion with connected faces, edge subdivision and a constrained **Bevel Edge** operation. The first bevel version works on closed mesh edges whose endpoints each connect to three edges; try a smaller width if the tool rejects an edge.
 
 ## Import a 3D asset
 

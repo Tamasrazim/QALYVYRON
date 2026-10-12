@@ -1482,6 +1482,32 @@ ApplicationWindow {
         setStatus("Deleted face and compacted unused mesh vertices.")
     }
 
+    function deleteSelectedVertex() {
+        const geometry = selectedEditableGeometry()
+        if (!geometry)
+            return
+
+        const removedIndex = vertexIndexSpinner.value
+        const historyBefore = captureHistoryCheckpoint()
+        pushUndoSnapshot()
+        if (!geometry.deleteVertex(removedIndex)) {
+            restoreHistoryCheckpoint(historyBefore)
+            setStatus("Vertex deletion was rejected. The last face cannot be removed.")
+            return
+        }
+
+        vertexIndexSpinner.value = Math.min(removedIndex, geometry.vertexCount - 1)
+        faceIndexSpinner.value = Math.min(faceIndexSpinner.value, geometry.faceCount - 1)
+        mergeTargetSpinner.value = Math.min(mergeTargetSpinner.value, geometry.vertexCount - 1)
+        edgeIndexSpinner.value = Math.min(edgeIndexSpinner.value, geometry.edgeCount - 1)
+        clearMeshVertexSelection()
+        clearMeshEdgeSelection()
+        vertexSelectionMode = false
+        edgeSelectionMode = false
+        refreshMeshEditFields()
+        setStatus("Deleted vertex " + removedIndex + " and the faces connected to it.")
+    }
+
     function mergeSelectedVertices() {
         const geometry = selectedEditableGeometry()
         if (!geometry)
@@ -2190,6 +2216,17 @@ ApplicationWindow {
                         onValueChanged: if (meshEditDialog.visible) root.refreshMeshEditFields()
                     }
                     Item { Layout.fillWidth: true }
+                }
+
+                Button {
+                    Layout.fillWidth: true
+                    text: "Delete Vertex + Connected Faces"
+                    enabled: root.selectedEditableGeometry() !== null
+                             && root.selectedEditableGeometry().vertexCount > 3
+                             && root.selectedEditableGeometry().faceCount > 1
+                    onClicked: root.deleteSelectedVertex()
+                    ToolTip.visible: hovered
+                    ToolTip.text: "Removes the selected vertex and every face attached to it. Undo can restore the removed geometry."
                 }
 
                 RowLayout {
