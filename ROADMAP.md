@@ -4,7 +4,7 @@ The target is a **usable, independent desktop alternative to Blender for everyda
 
 ## Current state
 
-QALYVYRON is an active mainline desktop application under development. It now has a Qt Quick 3D viewport, primitive scene objects, object transforms, a hierarchy, primitive material controls, camera/light settings, versioned scene files and viewport-preview export. The editable mesh kernel supports indexed vertex changes, viewport-driven face creation from ordered vertex selections, vertex merging, convex planar face extrusion/inset, face deletion, local geometry-only OBJ import, and OBJ export with transforms baked. Runtime-loaded GLB/glTF remains read-only. These new pathways still need a green build and runtime smoke tests before being treated as validated features.
+QALYVYRON is an active mainline desktop application under development. It now has a Qt Quick 3D viewport, primitive scene objects, object transforms, a hierarchy, primitive material controls, camera/light settings, versioned scene files and viewport-preview export. The editable mesh kernel supports indexed vertex changes, viewport-driven face creation from ordered vertex selections, vertex merging, convex planar face extrusion/inset, face deletion, local geometry-only OBJ import, and OBJ export with transforms baked. Runtime-loaded GLB/glTF remains read-only. The current commit has a green Linux build/test run and a Windows x64 build/test plus packaged-app startup smoke test; broader interactive workflow testing on supported hardware is still required.
 
 ## Stage 1 — Dependable scene workspace
 
@@ -15,7 +15,7 @@ QALYVYRON is an active mainline desktop application under development. It now ha
 - [x] Export a PNG of the viewport, labelled as a preview rather than a final render.
 - [x] Add bounded undo/redo checkpoints for common scene edits in the current implementation.
 - [x] Add initial local OBJ and glTF 2.0 loading using Qt Quick 3D AssetUtils.
-- [ ] Pass current Linux and Windows CI jobs.
+- [x] Pass current Linux and Windows CI jobs (Linux Qt 6 build/tests; Windows x64 build/tests, portable package staging, and packaged-app startup smoke test).
 - [ ] Run an application-level smoke test on a clean Windows machine and supported graphics hardware.
 - [ ] Verify undo/redo for each supported command, including mouse drags and save/reopen behavior.
 - [ ] Ensure failed file loads leave the prior scene intact and give a clear message.
@@ -83,7 +83,8 @@ These capabilities are planned only after the core modeling, asset, rendering, a
 ## Stage 7 — Release quality
 
 - [ ] Produce a repeatable Windows x64 build and a tested portable package/installer.
-- [ ] Add crash logs, autosave/recovery, project backups, and safe format migrations.
+- [x] Add automatic local recovery snapshots for unsaved scenes, with a startup restore/discard prompt and recovery tests on Linux and Windows CI.
+- [ ] Add crash logs, project backup history, and safe format migrations.
 - [ ] Test GPU and fallback paths, display scaling, large scenes, and memory pressure.
 - [ ] Document supported hardware, formats, limitations, license terms, and offline behavior.
 - [ ] Publish a release only after clean-machine installation and a complete real-project test.
