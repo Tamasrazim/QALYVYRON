@@ -1,3 +1,5 @@
+// What this does: Checks that scene files and OBJ files can be saved, reopened, and rejected cleanly when their contents are not valid.
+
 #include "projectio.h"
 
 #include <QCoreApplication>
