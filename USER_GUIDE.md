@@ -19,6 +19,7 @@ A new scene starts with one cube so there is only one thing to focus on. Use **A
 - **Front / Top / Side:** choose a useful view.
 - **Focus Selected:** center the camera on the selected object.
 - **Frame All:** calculate a view that includes the current scene; it works for distant objects and supported custom meshes too.
+- **Snap: Off / Snap: On:** turn grid snapping on or off for object dragging. Choose a step of 1, 5, 10, 25, or 50 scene units from the dropdown beside it. Snapping is off by default. It affects mouse-drag placement only; the numeric position fields remain exact.
 
 Use the inspector's numeric position, rotation, and scale fields when you need exact values. The transform gizmo is an early convenience control; axis-constrained movement is not yet implemented.
 
