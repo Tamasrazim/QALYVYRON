@@ -25,6 +25,7 @@ private slots:
     void torusHasClosedEditableTopology();
     void smoothShadingStateIsSavedAndRestored();
     void vertexEditsChangeSerializedMesh();
+    void invalidVertexEditsAreRejectedAtomically();
     void extrudingFaceAddsCapAndSides();
     void insettingFaceAddsInnerCapAndRing();
     void invalidInsetIsAtomic();
@@ -339,6 +340,20 @@ void EditableGeometryTests::vertexEditsChangeSerializedMesh()
     QVERIFY(geometry.setVertexPosition(0, replacement));
     QCOMPARE(geometry.vertexPosition(0), replacement);
     QCOMPARE(geometry.serializeMesh().value(QStringLiteral("vertices")).toList().size(), 8);
+}
+
+void EditableGeometryTests::invalidVertexEditsAreRejectedAtomically()
+{
+    EditableGeometry geometry;
+    const QVariantMap before = geometry.serializeMesh();
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    const float infinity = std::numeric_limits<float>::infinity();
+
+    QVERIFY(!geometry.setVertexPosition(0, QVector3D(nan, 0.0f, 0.0f)));
+    QVERIFY(!geometry.setVertexPosition(0, QVector3D(0.0f, infinity, 0.0f)));
+    QVERIFY(!geometry.setVertexPosition(0, QVector3D(1.0e6f + 1.0f, 0.0f, 0.0f)));
+    QVERIFY(!geometry.setVertexPosition(-1, QVector3D(0.0f, 0.0f, 0.0f)));
+    QCOMPARE(geometry.serializeMesh(), before);
 }
 
 void EditableGeometryTests::extrudingFaceAddsCapAndSides()
