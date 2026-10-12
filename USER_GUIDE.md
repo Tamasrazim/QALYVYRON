@@ -17,7 +17,8 @@ A new scene starts with one cube so there is only one thing to focus on. Use **A
 - **Left click:** select an object.
 - **Left drag on a shape:** move it in the scene.
 - **Front / Top / Side:** choose a useful view.
-- **Frame Scene:** return to the default framing.
+- **Focus Selected:** center the camera on the selected object.
+- **Frame All:** calculate a view that includes the current scene; it works for distant objects and supported custom meshes too.
 
 Use the inspector's numeric position, rotation, and scale fields when you need exact values. The transform gizmo is an early convenience control; axis-constrained movement is not yet implemented.
 

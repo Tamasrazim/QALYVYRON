@@ -263,13 +263,88 @@ ApplicationWindow {
         const yaw = orbitYaw * Math.PI / 180
         const pitch = orbitPitch * Math.PI / 180
         const horizontal = orbitDistance * Math.cos(pitch)
+        const target = focusTarget.position
         camera.position = Qt.vector3d(
-            horizontal * Math.sin(yaw),
-            orbitDistance * Math.sin(pitch),
-            horizontal * Math.cos(yaw)
+            target.x + horizontal * Math.sin(yaw),
+            target.y + orbitDistance * Math.sin(pitch),
+            target.z + horizontal * Math.cos(yaw)
         )
         camera.lookAt(focusTarget)
         Qt.callLater(root.updateGizmo)
+    }
+
+    function objectFrameRadius(object) {
+        if (!object)
+            return 80
+
+        const scale = Math.max(0.01, Number(object.uniformScale) || 1)
+        let radius = 80 * scale
+        const geometry = !object.editorImported ? object.geometry : null
+        if (geometry && geometry.vertexCount > 0) {
+            for (let i = 0; i < geometry.vertexCount; ++i) {
+                const vertex = geometry.vertexPosition(i)
+                const vertexRadius = Math.sqrt(vertex.x * vertex.x
+                                               + vertex.y * vertex.y
+                                               + vertex.z * vertex.z) * scale
+                radius = Math.max(radius, vertexRadius)
+            }
+        }
+        return Math.max(20, radius)
+    }
+
+    function focusSelectedObject() {
+        if (!selectedObject) {
+            setStatus("Select an object before focusing the view.")
+            return
+        }
+
+        pushUndoSnapshot()
+        focusTarget.position = selectedObject.position
+        orbitDistance = Math.max(470, Math.min(2800, objectFrameRadius(selectedObject) * 4.8))
+        updateCamera()
+        setStatus("Focused the view on " + selectedObject.editorLabel + ".")
+    }
+
+    function frameAllObjects() {
+        if (sceneObjects.length === 0) {
+            focusTarget.position = Qt.vector3d(0, 0, 0)
+            orbitDistance = 470
+            updateCamera()
+            setStatus("The scene is empty.")
+            return
+        }
+
+        pushUndoSnapshot()
+        let minX = Infinity, minY = Infinity, minZ = Infinity
+        let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity
+        let framedCount = 0
+
+        for (let i = 0; i < sceneObjects.length; ++i) {
+            const object = sceneObjects[i]
+            if (!object)
+                continue
+
+            const position = object.position
+            const radius = objectFrameRadius(object)
+            minX = Math.min(minX, position.x - radius)
+            minY = Math.min(minY, position.y - radius)
+            minZ = Math.min(minZ, position.z - radius)
+            maxX = Math.max(maxX, position.x + radius)
+            maxY = Math.max(maxY, position.y + radius)
+            maxZ = Math.max(maxZ, position.z + radius)
+            ++framedCount
+        }
+
+        if (framedCount === 0)
+            return
+
+        focusTarget.position = Qt.vector3d((minX + maxX) * 0.5,
+                                           (minY + maxY) * 0.5,
+                                           (minZ + maxZ) * 0.5)
+        const span = Math.max(maxX - minX, maxY - minY, maxZ - minZ)
+        orbitDistance = Math.max(470, Math.min(2800, span * 1.4 + 130))
+        updateCamera()
+        setStatus("Framed " + framedCount + " scene object(s).")
     }
 
     function updateGizmo() {
@@ -873,6 +948,7 @@ ApplicationWindow {
         orbitYaw = 34
         orbitPitch = 23
         orbitDistance = 470
+        focusTarget.position = Qt.vector3d(0, 0, 0)
         camera.fieldOfView = 45
         keyLight.brightness = 1.7
         fillLight.brightness = 65
@@ -923,7 +999,10 @@ ApplicationWindow {
                 fillTintIndex: fillTintCombo.currentIndex,
                 orbitYaw: root.orbitYaw,
                 orbitPitch: root.orbitPitch,
-                orbitDistance: root.orbitDistance
+                orbitDistance: root.orbitDistance,
+                orbitTargetX: focusTarget.position.x,
+                orbitTargetY: focusTarget.position.y,
+                orbitTargetZ: focusTarget.position.z
             },
             objects: serializedObjects
         }
@@ -943,6 +1022,7 @@ ApplicationWindow {
         orbitYaw = 34
         orbitPitch = 23
         orbitDistance = 470
+        focusTarget.position = Qt.vector3d(0, 0, 0)
 
         const settings = document.settings || ({})
         if (settings.cameraFov !== undefined && Number.isFinite(Number(settings.cameraFov)))
@@ -966,7 +1046,15 @@ ApplicationWindow {
         if (settings.orbitPitch !== undefined && Number.isFinite(Number(settings.orbitPitch)))
             orbitPitch = Math.max(-80, Math.min(80, Number(settings.orbitPitch)))
         if (settings.orbitDistance !== undefined && Number.isFinite(Number(settings.orbitDistance)))
-            orbitDistance = Math.max(190, Math.min(1050, Number(settings.orbitDistance)))
+            orbitDistance = Math.max(120, Math.min(2800, Number(settings.orbitDistance)))
+
+        const targetX = settings.orbitTargetX !== undefined && Number.isFinite(Number(settings.orbitTargetX))
+                        ? Math.max(-1000000, Math.min(1000000, Number(settings.orbitTargetX))) : 0
+        const targetY = settings.orbitTargetY !== undefined && Number.isFinite(Number(settings.orbitTargetY))
+                        ? Math.max(-1000000, Math.min(1000000, Number(settings.orbitTargetY))) : 0
+        const targetZ = settings.orbitTargetZ !== undefined && Number.isFinite(Number(settings.orbitTargetZ))
+                        ? Math.max(-1000000, Math.min(1000000, Number(settings.orbitTargetZ))) : 0
+        focusTarget.position = Qt.vector3d(targetX, targetY, targetZ)
 
         const savedObjects = document.objects || []
         for (let i = 0; i < savedObjects.length; ++i) {
@@ -2440,7 +2528,7 @@ ApplicationWindow {
                             acceptedDevices: PointerDevice.Mouse
                             onWheel: function(event) {
                                 root.pushUndoSnapshot()
-                                root.orbitDistance = Math.max(190, Math.min(1050,
+                                root.orbitDistance = Math.max(120, Math.min(2800,
                                     root.orbitDistance - event.angleDelta.y * 0.35))
                                 root.updateCamera()
                             }
@@ -2706,16 +2794,20 @@ ApplicationWindow {
                             }
                         }
 
-                        Button {
+                        RowLayout {
                             anchors.left: parent.left
                             anchors.bottom: parent.bottom
                             anchors.margins: 14
-                            text: "Frame Scene"
-                            onClicked: {
-                                root.orbitYaw = 34
-                                root.orbitPitch = 23
-                                root.orbitDistance = 470
-                                root.updateCamera()
+                            spacing: 6
+
+                            Button {
+                                text: "Frame All"
+                                onClicked: root.frameAllObjects()
+                            }
+                            Button {
+                                text: "Focus Selected"
+                                enabled: root.selectedObject !== null
+                                onClicked: root.focusSelectedObject()
                             }
                         }
                     }

@@ -10,7 +10,7 @@ QALYVYRON is being developed as a local desktop tool for creating, editing, anim
 
 - First-run welcome screen and a four-step, task-based quick tour; beginner mode keeps common actions visible while hiding numeric transforms, lighting, camera, roughness, and mesh-editing controls until requested. The startup choice is saved and respected on later launches.
 - A simple one-cube starting scene, plain-language shape labels, a beginner size slider, visible color swatches with hover labels, and clear viewport mouse guidance.
-- Interactive 3D viewport with orbit, zoom, selection, and a reference grid.
+- Interactive 3D viewport with orbit, zoom, selection, and a reference grid; **Focus Selected** centers one object and **Frame All** calculates a scene-wide view, with the focus point saved in the project.
 - Cube, sphere, cylinder, cone, and plane scene objects.
 - Object hierarchy, renaming, duplication, deletion, and direct transform editing.
 - Editable polygon-mesh tools for built-in primitives and imported OBJ geometry: create faces from ordered viewport vertex selections, merge vertices, change vertex coordinates, extrude and inset convex planar faces, and delete faces.
