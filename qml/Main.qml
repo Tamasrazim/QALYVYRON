@@ -4124,6 +4124,32 @@ ApplicationWindow {
                         }
                     }
 
+                    CheckBox {
+                        visible: !root.beginnerMode
+                        enabled: root.selectedObject !== null
+                                 && !root.selectedObject.editorImported
+                                 && root.selectedObject.geometry !== null
+                        text: "Smooth shading"
+                        checked: root.selectedObject !== null
+                                 && !root.selectedObject.editorImported
+                                 && root.selectedObject.geometry !== null
+                                 ? root.selectedObject.geometry.smoothShading : false
+                        ToolTip.visible: hovered
+                        ToolTip.text: "Average shared-vertex normals for a rounded look on curved meshes."
+                        onToggled: {
+                            if (!root.selectedObject || root.selectedObject.editorImported
+                                    || !root.selectedObject.geometry
+                                    || root.selectedObject.geometry.smoothShading === checked) {
+                                return
+                            }
+                            root.pushUndoSnapshot()
+                            root.selectedObject.geometry.smoothShading = checked
+                            root.setStatus(checked
+                                           ? "Smooth shading enabled for " + root.selectedObject.editorLabel + "."
+                                           : "Flat shading enabled for " + root.selectedObject.editorLabel + ".")
+                        }
+                    }
+
                     Text {
                         Layout.fillWidth: true
                         visible: root.selectedObject !== null && root.selectedObject.editorImported

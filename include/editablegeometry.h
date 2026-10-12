@@ -19,6 +19,7 @@ class EditableGeometry : public QQuick3DGeometry
     Q_PROPERTY(int vertexCount READ vertexCount NOTIFY meshChanged)
     Q_PROPERTY(int edgeCount READ edgeCount NOTIFY meshChanged)
     Q_PROPERTY(int faceCount READ faceCount NOTIFY meshChanged)
+    Q_PROPERTY(bool smoothShading READ smoothShading WRITE setSmoothShading NOTIFY smoothShadingChanged)
 
 public:
     explicit EditableGeometry(QQuick3DObject *parent = nullptr);
@@ -28,6 +29,8 @@ public:
     int vertexCount() const;
     int edgeCount() const;
     int faceCount() const;
+    bool smoothShading() const;
+    void setSmoothShading(bool enabled);
 
     Q_INVOKABLE QVector3D vertexPosition(int index) const;
     Q_INVOKABLE QVariantList edgeVertexIndices(int index) const;
@@ -50,6 +53,7 @@ public:
 signals:
     void shapeChanged();
     void meshChanged();
+    void smoothShadingChanged();
 
 private:
     static constexpr int kMaximumVertices = 100000;
@@ -57,6 +61,7 @@ private:
     static constexpr int kMaximumFaceCorners = 4096;
 
     QString m_shape = QStringLiteral("Cube");
+    bool m_smoothShading = false;
     QVector<QVector3D> m_vertices;
     QVector<QVector<int>> m_faces;
     QVector<QPair<int, int>> m_edges;

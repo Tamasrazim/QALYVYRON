@@ -23,6 +23,7 @@ private slots:
     void invalidEdgeLoopsAreRejectedAtomically();
     void primitiveShapesHaveExpectedTopology();
     void torusHasClosedEditableTopology();
+    void smoothShadingStateIsSavedAndRestored();
     void vertexEditsChangeSerializedMesh();
     void extrudingFaceAddsCapAndSides();
     void insettingFaceAddsInnerCapAndRing();
@@ -301,7 +302,33 @@ void EditableGeometryTests::torusHasClosedEditableTopology()
     QCOMPARE(restored.edgeCount(), geometry.edgeCount());
 }
 
+void EditableGeometryTests::smoothShadingStateIsSavedAndRestored()
+{
+    EditableGeometry geometry;
+    geometry.setShape(QStringLiteral("Sphere"));
+    QVERIFY(!geometry.smoothShading());
+
+    QSignalSpy changed(&geometry, &EditableGeometry::smoothShadingChanged);
+    QVERIFY(changed.isValid());
+    geometry.setSmoothShading(true);
+    QVERIFY(geometry.smoothShading());
+    QCOMPARE(changed.size(), 1);
+
+    const QVariantMap saved = geometry.serializeMesh();
+    QVERIFY(saved.value(QStringLiteral("smoothShading")).toBool());
+
+    EditableGeometry restored;
+    QVERIFY(restored.loadMesh(saved));
+    QVERIFY(restored.smoothShading());
+    QCOMPARE(restored.serializeMesh(), saved);
+
+    restored.setSmoothShading(false);
+    QVERIFY(!restored.smoothShading());
+    QVERIFY(!restored.serializeMesh().value(QStringLiteral("smoothShading")).toBool());
+}
+
 void EditableGeometryTests::vertexEditsChangeSerializedMesh()
+
 
 {
     EditableGeometry geometry;

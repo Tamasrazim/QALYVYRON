@@ -42,6 +42,22 @@ QString EditableGeometry::shape() const
     return m_shape;
 }
 
+bool EditableGeometry::smoothShading() const
+{
+    return m_smoothShading;
+}
+
+void EditableGeometry::setSmoothShading(bool enabled)
+{
+    if (m_smoothShading == enabled)
+        return;
+
+    m_smoothShading = enabled;
+    rebuildGeometry();
+    emit smoothShadingChanged();
+    emit meshChanged();
+}
+
 void EditableGeometry::setShape(const QString &shape)
 {
     const QString normalized = shape.trimmed();
@@ -56,8 +72,12 @@ void EditableGeometry::setShape(const QString &shape)
     if (m_shape == supported && !m_vertices.isEmpty())
         return;
 
+    const bool wasSmoothShading = m_smoothShading;
     m_shape = supported;
+    m_smoothShading = false;
     createPrimitive(supported);
+    if (wasSmoothShading)
+        emit smoothShadingChanged();
     emit shapeChanged();
     emit meshChanged();
 }
@@ -1178,7 +1198,8 @@ QVariantMap EditableGeometry::serializeMesh() const
     return {
         {QStringLiteral("shape"), m_shape},
         {QStringLiteral("vertices"), vertices},
-        {QStringLiteral("faces"), faces}
+        {QStringLiteral("faces"), faces},
+        {QStringLiteral("smoothShading"), m_smoothShading}
     };
 }
 
@@ -1268,10 +1289,15 @@ bool EditableGeometry::loadMesh(const QVariantMap &data)
          || requestedShape == QLatin1String("Custom"))
         ? requestedShape : QStringLiteral("Custom");
 
+    const bool loadedSmoothShading = data.value(QStringLiteral("smoothShading"), false).toBool();
+    const bool smoothStateChanged = m_smoothShading != loadedSmoothShading;
     m_vertices = vertices;
     m_faces = faces;
     m_shape = loadedShape;
+    m_smoothShading = loadedSmoothShading;
     rebuildGeometry();
+    if (smoothStateChanged)
+        emit smoothShadingChanged();
     emit shapeChanged();
     emit meshChanged();
     return true;
@@ -1502,6 +1528,39 @@ void EditableGeometry::rebuildGeometry()
 {
     rebuildEdgeIndex();
 
+    // Smooth shading averages area-weighted face normals at shared vertices.
+    // This changes only vertex normals; the editable face/edge topology stays intact.
+    QVector<QVector3D> smoothNormals;
+    if (m_smoothShading) {
+        smoothNormals.resize(m_vertices.size());
+        for (const QVector<int> &face : m_faces) {
+            if (face.size() < 3)
+                continue;
+
+            QVector3D areaNormal;
+            for (int i = 0; i < face.size(); ++i) {
+                const QVector3D &a = m_vertices.at(face.at(i));
+                const QVector3D &b = m_vertices.at(face.at((i + 1) % face.size()));
+                areaNormal.setX(areaNormal.x() + (a.y() - b.y()) * (a.z() + b.z()));
+                areaNormal.setY(areaNormal.y() + (a.z() - b.z()) * (a.x() + b.x()));
+                areaNormal.setZ(areaNormal.z() + (a.x() - b.x()) * (a.y() + b.y()));
+            }
+            if (!finiteVector(areaNormal)
+                || areaNormal.lengthSquared() < kEpsilon * kEpsilon) {
+                continue;
+            }
+            for (const int vertexIndex : face)
+                smoothNormals[vertexIndex] += areaNormal;
+        }
+
+        for (QVector3D &normal : smoothNormals) {
+            if (!finiteVector(normal) || normal.lengthSquared() < kEpsilon * kEpsilon)
+                normal = QVector3D(0, 1, 0);
+            else
+                normal.normalize();
+        }
+    }
+
     QByteArray vertexBuffer;
     int renderedVertexCount = 0;
     for (const QVector<int> &face : m_faces) {
@@ -1534,12 +1593,14 @@ void EditableGeometry::rebuildGeometry()
             const int triangle[] = {face.first(), face.at(corner), face.at(corner + 1)};
             for (const int vertexIndex : triangle) {
                 const QVector3D &position = m_vertices.at(vertexIndex);
+                const QVector3D &vertexNormal =
+                    m_smoothShading ? smoothNormals.at(vertexIndex) : normal;
                 *output++ = position.x();
                 *output++ = position.y();
                 *output++ = position.z();
-                *output++ = normal.x();
-                *output++ = normal.y();
-                *output++ = normal.z();
+                *output++ = vertexNormal.x();
+                *output++ = vertexNormal.y();
+                *output++ = vertexNormal.z();
             }
         }
     }

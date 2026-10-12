@@ -121,8 +121,12 @@ struct Triangle
     QVector3D albedo;
     QVector3D centroid;
     Bounds bounds;
+    QVector3D normalA;
+    QVector3D normalB;
+    QVector3D normalC;
     float roughness = 0.38f;
     float metalness = 0.08f;
+    bool smoothShading = false;
 };
 
 struct Hit
@@ -189,7 +193,9 @@ bool intersectsBounds(const Ray &ray,
 bool intersectTriangle(const Ray &ray,
                        const Triangle &triangle,
                        float maxDistance,
-                       float *distance)
+                       float *distance,
+                       float *barycentricU = nullptr,
+                       float *barycentricV = nullptr)
 {
     const QVector3D edge1 = triangle.b - triangle.a;
     const QVector3D edge2 = triangle.c - triangle.a;
@@ -215,6 +221,10 @@ bool intersectTriangle(const Ray &ray,
         return false;
 
     *distance = hitDistance;
+    if (barycentricU)
+        *barycentricU = u;
+    if (barycentricV)
+        *barycentricV = v;
     return true;
 }
 
@@ -319,6 +329,61 @@ bool appendSceneTriangles(const QVariantMap &scene,
             std::clamp(numberOr(object, QStringLiteral("roughness"), 0.38), 0.0, 1.0));
         const float metalness = static_cast<float>(
             std::clamp(numberOr(object, QStringLiteral("metalness"), 0.08), 0.0, 1.0));
+        const bool smoothShading = mesh.value(QStringLiteral("smoothShading")).toBool();
+
+        // Average area-weighted face normals at shared vertices before triangulation.
+        QVector<QVector3D> localSmoothNormals(localVertices.size());
+        if (smoothShading) {
+            for (const QVariant &rawNormalFace : rawFaces) {
+                const QVariantList rawCorners = rawNormalFace.toList();
+                if (rawCorners.size() < 3 || rawCorners.size() > 4096)
+                    continue;
+
+                QVector<int> face;
+                face.reserve(rawCorners.size());
+                for (const QVariant &rawIndex : rawCorners) {
+                    bool ok = false;
+                    const int index = rawIndex.toInt(&ok);
+                    if (!ok || index < 0 || index >= localVertices.size()) {
+                        *error = QStringLiteral("Object '%1' contains an invalid face index.")
+                                     .arg(object.value(QStringLiteral("label")).toString());
+                        return false;
+                    }
+                    face.append(index);
+                }
+
+                QVector3D areaNormal;
+                for (int i = 0; i < face.size(); ++i) {
+                    const QVector3D &a = localVertices.at(face.at(i));
+                    const QVector3D &b = localVertices.at(face.at((i + 1) % face.size()));
+                    areaNormal.setX(areaNormal.x() + (a.y() - b.y()) * (a.z() + b.z()));
+                    areaNormal.setY(areaNormal.y() + (a.z() - b.z()) * (a.x() + b.x()));
+                    areaNormal.setZ(areaNormal.z() + (a.x() - b.x()) * (a.y() + b.y()));
+                }
+                if (!finiteVector(areaNormal) || areaNormal.lengthSquared() < 1.0e-10f)
+                    continue;
+                for (const int index : face)
+                    localSmoothNormals[index] += areaNormal;
+            }
+            for (QVector3D &normal : localSmoothNormals) {
+                if (!finiteVector(normal) || normal.lengthSquared() < 1.0e-10f)
+                    normal = QVector3D(0, 1, 0);
+                else
+                    normal.normalize();
+            }
+        }
+
+        auto worldSmoothNormal = [&](int index) {
+            QVector3D normal = localSmoothNormals.at(index);
+            // Inverse-scale before rotation to preserve normals under non-uniform scaling.
+            normal.setX(normal.x() / static_cast<float>(scaleX));
+            normal.setY(normal.y() / static_cast<float>(scaleY));
+            normal.setZ(normal.z() / static_cast<float>(scaleZ));
+            normal = rotation.rotatedVector(normal);
+            if (!finiteVector(normal) || normal.lengthSquared() < 1.0e-10f)
+                return QVector3D(0, 1, 0);
+            return normal.normalized();
+        };
 
         for (const QVariant &rawFace : rawFaces) {
             const QVariantList corners = rawFace.toList();
@@ -365,6 +430,12 @@ bool appendSceneTriangles(const QVariantMap &scene,
                 triangle.albedo = albedo;
                 triangle.roughness = roughness;
                 triangle.metalness = metalness;
+                triangle.smoothShading = smoothShading;
+                if (smoothShading) {
+                    triangle.normalA = worldSmoothNormal(face.first());
+                    triangle.normalB = worldSmoothNormal(face.at(corner));
+                    triangle.normalC = worldSmoothNormal(face.at(corner + 1));
+                }
                 triangle.centroid = (triangle.a + triangle.b + triangle.c) / 3.0f;
                 triangle.bounds.include(triangle.a);
                 triangle.bounds.include(triangle.b);
@@ -419,14 +490,28 @@ public:
                 for (int item = 0; item < node.count; ++item) {
                     const int triangleIndex = order.at(node.first + item);
                     float distance = 0.0f;
+                    float barycentricU = 0.0f;
+                    float barycentricV = 0.0f;
                     if (intersectTriangle(ray, triangles.at(triangleIndex),
-                                          hit->distance, &distance)) {
+                                          hit->distance, &distance,
+                                          &barycentricU, &barycentricV)) {
                         hit->distance = distance;
                         hit->triangleIndex = triangleIndex;
                         hit->position = ray.origin + ray.direction * distance;
+                        const Triangle &hitTriangle = triangles.at(triangleIndex);
                         QVector3D normal = QVector3D::crossProduct(
-                            triangles.at(triangleIndex).b - triangles.at(triangleIndex).a,
-                            triangles.at(triangleIndex).c - triangles.at(triangleIndex).a);
+                            hitTriangle.b - hitTriangle.a,
+                            hitTriangle.c - hitTriangle.a);
+                        if (hitTriangle.smoothShading) {
+                            const QVector3D interpolated =
+                                hitTriangle.normalA * (1.0f - barycentricU - barycentricV)
+                                + hitTriangle.normalB * barycentricU
+                                + hitTriangle.normalC * barycentricV;
+                            if (finiteVector(interpolated)
+                                && interpolated.lengthSquared() > 1.0e-10f) {
+                                normal = interpolated;
+                            }
+                        }
                         if (normal.lengthSquared() > 1.0e-10f)
                             normal.normalize();
                         if (QVector3D::dotProduct(normal, ray.direction) > 0.0f)

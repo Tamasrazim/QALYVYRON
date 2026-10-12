@@ -71,6 +71,7 @@ private slots:
     void hiddenObjectsAreNotIncludedInFinalRender();
     void offlineRenderRespectsViewportFocusTarget();
     void metalnessChangesFinalRenderAppearance();
+    void smoothShadingChangesFinalRenderAppearance();
     void writesPngFromSceneGeometry();
 };
 
@@ -255,6 +256,89 @@ void FinalRendererTests::metalnessChangesFinalRenderAppearance()
 
     QVERIFY2(totalPixelDifference > 1000,
              "Metalness must visibly affect final rendering, not just the inspector value.");
+    QVERIFY(!renderer.busy());
+}
+
+void FinalRendererTests::smoothShadingChangesFinalRenderAppearance()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    auto makeCubeScene = [](bool smooth) {
+        QVariantMap scene = smallPlaneScene();
+        QVariantList objects = scene.value(QStringLiteral("objects")).toList();
+        QVariantMap object = objects.first().toMap();
+
+        QVariantList vertices;
+        const QVector<QVector3D> points{
+            {-50, -50, -50}, {50, -50, -50}, {50, 50, -50}, {-50, 50, -50},
+            {-50, -50, 50}, {50, -50, 50}, {50, 50, 50}, {-50, 50, 50}
+        };
+        for (const QVector3D &point : points) {
+            vertices.append(QVariant::fromValue(QVariantList{
+                static_cast<double>(point.x()),
+                static_cast<double>(point.y()),
+                static_cast<double>(point.z())
+            }));
+        }
+
+        QVariantList faces;
+        const QVector<QVariantList> polygons{
+            QVariantList{4, 5, 6, 7}, QVariantList{1, 0, 3, 2},
+            QVariantList{5, 1, 2, 6}, QVariantList{0, 4, 7, 3},
+            QVariantList{3, 7, 6, 2}, QVariantList{0, 1, 5, 4}
+        };
+        for (const QVariantList &face : polygons)
+            faces.append(QVariant::fromValue(face));
+
+        const QVariantMap mesh{
+            {QStringLiteral("shape"), QStringLiteral("Cube")},
+            {QStringLiteral("vertices"), vertices},
+            {QStringLiteral("faces"), faces},
+            {QStringLiteral("smoothShading"), smooth}
+        };
+        object.insert(QStringLiteral("shape"), QStringLiteral("Cube"));
+        object.insert(QStringLiteral("label"), QStringLiteral("Shading Cube"));
+        object.insert(QStringLiteral("mesh"), mesh);
+        scene.insert(QStringLiteral("objects"), QVariantList{object});
+        return scene;
+    };
+
+    FinalRenderer renderer;
+    QSignalSpy finished(&renderer, &FinalRenderer::renderFinished);
+    QVERIFY(finished.isValid());
+
+    const QString flatPath = directory.filePath(QStringLiteral("flat-cube.png"));
+    QVERIFY(renderer.startRender(QUrl::fromLocalFile(flatPath),
+                                 makeCubeScene(false), 48, 48, 2, 0));
+    QTRY_VERIFY_WITH_TIMEOUT(!finished.isEmpty(), 10000);
+    const QList<QVariant> flatResult = finished.takeFirst();
+    QVERIFY2(flatResult.at(0).toBool(), qPrintable(flatResult.at(1).toString()));
+    const QImage flatImage(flatPath);
+    QVERIFY(!flatImage.isNull());
+
+    const QString smoothPath = directory.filePath(QStringLiteral("smooth-cube.png"));
+    QVERIFY(renderer.startRender(QUrl::fromLocalFile(smoothPath),
+                                 makeCubeScene(true), 48, 48, 2, 0));
+    QTRY_VERIFY_WITH_TIMEOUT(!finished.isEmpty(), 10000);
+    const QList<QVariant> smoothResult = finished.takeFirst();
+    QVERIFY2(smoothResult.at(0).toBool(), qPrintable(smoothResult.at(1).toString()));
+    const QImage smoothImage(smoothPath);
+    QVERIFY(!smoothImage.isNull());
+
+    qint64 totalPixelDifference = 0;
+    for (int y = 0; y < flatImage.height(); ++y) {
+        const auto *flatRow = reinterpret_cast<const QRgb *>(flatImage.constScanLine(y));
+        const auto *smoothRow = reinterpret_cast<const QRgb *>(smoothImage.constScanLine(y));
+        for (int x = 0; x < flatImage.width(); ++x) {
+            totalPixelDifference += std::abs(qRed(flatRow[x]) - qRed(smoothRow[x]));
+            totalPixelDifference += std::abs(qGreen(flatRow[x]) - qGreen(smoothRow[x]));
+            totalPixelDifference += std::abs(qBlue(flatRow[x]) - qBlue(smoothRow[x]));
+        }
+    }
+
+    QVERIFY2(totalPixelDifference > 1000,
+             "The smooth-shading setting must change the final render, not only the viewport.");
     QVERIFY(!renderer.busy());
 }
 
