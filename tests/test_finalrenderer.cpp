@@ -69,6 +69,7 @@ private slots:
     void rejectsUnsafeRenderWorkloads();
     void cancelledRenderDoesNotWritePartialOutput();
     void hiddenObjectsAreNotIncludedInFinalRender();
+    void offlineRenderRespectsViewportFocusTarget();
     void writesPngFromSceneGeometry();
 };
 
@@ -152,6 +153,51 @@ void FinalRendererTests::hiddenObjectsAreNotIncludedInFinalRender()
     QVERIFY(result.at(1).toString().contains(QStringLiteral("No editable mesh geometry"),
                                              Qt::CaseInsensitive));
     QVERIFY(!QFileInfo::exists(path));
+    QVERIFY(!renderer.busy());
+}
+
+void FinalRendererTests::offlineRenderRespectsViewportFocusTarget()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    // Move the only mesh away from origin and frame that same world position.
+    QVariantMap scene = smallPlaneScene();
+    QVariantList objects = scene.value(QStringLiteral("objects")).toList();
+    QVERIFY(!objects.isEmpty());
+    QVariantMap shiftedObject = objects.first().toMap();
+    shiftedObject.insert(QStringLiteral("x"), 300.0);
+    scene.insert(QStringLiteral("objects"), QVariantList{shiftedObject});
+
+    QVariantMap settings = scene.value(QStringLiteral("settings")).toMap();
+    settings.insert(QStringLiteral("orbitTargetX"), 300.0);
+    settings.insert(QStringLiteral("orbitTargetY"), 0.0);
+    settings.insert(QStringLiteral("orbitTargetZ"), 0.0);
+    scene.insert(QStringLiteral("settings"), settings);
+
+    FinalRenderer renderer;
+    QSignalSpy finished(&renderer, &FinalRenderer::renderFinished);
+    QVERIFY(finished.isValid());
+
+    const QString path = directory.filePath(QStringLiteral("focused-off-origin-render.png"));
+    QVERIFY(renderer.startRender(QUrl::fromLocalFile(path), scene, 48, 48, 2, 0));
+    QTRY_VERIFY_WITH_TIMEOUT(!finished.isEmpty(), 10000);
+
+    const QList<QVariant> result = finished.takeFirst();
+    QVERIFY2(result.at(0).toBool(), qPrintable(result.at(1).toString()));
+    const QImage image(path);
+    QVERIFY(!image.isNull());
+
+    // The off-origin mesh must be in frame; a camera mistakenly aimed at (0, 0, 0)
+    // would produce only the uniform background for this deliberately shifted scene.
+    QSet<QRgb> uniqueColors;
+    for (int y = 0; y < image.height(); ++y) {
+        const auto *row = reinterpret_cast<const QRgb *>(image.constScanLine(y));
+        for (int x = 0; x < image.width(); ++x)
+            uniqueColors.insert(row[x]);
+    }
+    QVERIFY2(uniqueColors.size() > 1,
+             "The final camera must render the mesh at the saved viewport focus target.");
     QVERIFY(!renderer.busy());
 }
 

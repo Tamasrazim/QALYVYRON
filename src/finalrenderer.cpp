@@ -817,11 +817,22 @@ void FinalRenderer::runRender(QString outputPath,
         const float fov = static_cast<float>(std::clamp(
             numberOr(settings, QStringLiteral("cameraFov"), 45.0), 10.0, 120.0));
 
+        // Focus/fame actions save a world-space target in the scene settings.
+        // Keep the offline camera aimed at that target, not hard-coded at world origin.
+        const QVector3D cameraTarget(
+            static_cast<float>(std::clamp(
+                numberOr(settings, QStringLiteral("orbitTargetX"), 0.0), -1.0e6, 1.0e6)),
+            static_cast<float>(std::clamp(
+                numberOr(settings, QStringLiteral("orbitTargetY"), 0.0), -1.0e6, 1.0e6)),
+            static_cast<float>(std::clamp(
+                numberOr(settings, QStringLiteral("orbitTargetZ"), 0.0), -1.0e6, 1.0e6)));
+
         const float horizontalDistance = distance * std::cos(pitch);
-        const QVector3D cameraPosition(horizontalDistance * std::sin(yaw),
-                                       distance * std::sin(pitch),
-                                       horizontalDistance * std::cos(yaw));
-        const QVector3D forward = (-cameraPosition).normalized();
+        const QVector3D cameraOffset(horizontalDistance * std::sin(yaw),
+                                     distance * std::sin(pitch),
+                                     horizontalDistance * std::cos(yaw));
+        const QVector3D cameraPosition = cameraTarget + cameraOffset;
+        const QVector3D forward = (cameraTarget - cameraPosition).normalized();
         QVector3D right = QVector3D::crossProduct(forward, QVector3D(0, 1, 0)).normalized();
         if (right.lengthSquared() < 1.0e-8f)
             right = QVector3D(1, 0, 0);

@@ -21,7 +21,7 @@ QALYVYRON is being developed as a local desktop tool for creating, editing, anim
 - **Wavefront OBJ (`.obj`) import:** vertex positions and polygon faces are parsed into QALYVYRON's editable mesh data. OBJ meshes are embedded in `.qvscene` projects and can be edited with indexed vertex coordinates and face extrusion.
 - **Wavefront OBJ export:** writes editable mesh objects with their scene transforms baked into exported vertex positions. Runtime-loaded `.glb`/`.gltf` assets are skipped with a clear warning.
 - **glTF 2.0 (`.glb`, `.gltf`) preview import:** loaded by Qt Quick 3D's runtime loader. These objects remain read-only and reference their original local files.
-- CPU offline final PNG rendering from scene triangles with a BVH accelerator, multisample anti-aliasing, directional/point lighting, hard shadows, material roughness, and configurable diffuse indirect bounces.
+- CPU offline final PNG rendering from scene triangles with a BVH accelerator, multisample anti-aliasing, directional/point lighting, hard shadows, material roughness, and configurable diffuse indirect bounces. The final-render camera also honors the saved viewport focus target, so framing an object away from world origin works in the output PNG.
 - Separate viewport-preview PNG export for quick captures. It is not confused with a final offline render.
 
 The first OBJ path is geometry-only: it currently reads `v` and `f` data, not OBJ normals, UV coordinates, MTL materials, or textures. glTF source paths are not yet collected into portable project folders, so those files must remain at their original locations when reopening scenes.
