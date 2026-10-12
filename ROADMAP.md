@@ -9,7 +9,7 @@ QALYVYRON is an active mainline desktop application under development. It now ha
 ## Stage 1 — Dependable scene workspace
 
 - [x] Establish the C++/Qt 6 application and versioned local scene-file I/O.
-- [x] Add a real-time 3D viewport and common primitives.
+- [x] Add a real-time 3D viewport and common primitives, including an editable torus mesh.
 - [x] Add hierarchy selection, rename, duplicate, delete, numeric transforms, and per-object visibility controls.
 - [x] Add basic primitive material, camera and light controls.
 - [x] Export a PNG of the viewport, labelled as a preview rather than a final render.

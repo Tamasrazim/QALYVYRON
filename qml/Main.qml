@@ -2726,6 +2726,11 @@ ApplicationWindow {
                             text: "+ Plane"
                             onClicked: root.createPrimitive("Plane")
                         }
+                        Button {
+                            Layout.fillWidth: true
+                            text: "+ Torus"
+                            onClicked: root.createPrimitive("Torus")
+                        }
                     }
 
                     Button {

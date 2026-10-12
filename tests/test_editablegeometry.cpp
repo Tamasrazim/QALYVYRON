@@ -20,6 +20,7 @@ private slots:
     void closedEdgeLoopCreatesFaceForDeletedSurface();
     void invalidEdgeLoopsAreRejectedAtomically();
     void primitiveShapesHaveExpectedTopology();
+    void torusHasClosedEditableTopology();
     void vertexEditsChangeSerializedMesh();
     void extrudingFaceAddsCapAndSides();
     void insettingFaceAddsInnerCapAndRing();
@@ -227,7 +228,34 @@ void EditableGeometryTests::primitiveShapesHaveExpectedTopology()
     QCOMPARE(geometry.faceCount(), 512);
 }
 
+void EditableGeometryTests::torusHasClosedEditableTopology()
+{
+    EditableGeometry geometry;
+    geometry.setShape(QStringLiteral("Torus"));
+
+    // Each shared grid point belongs to neighboring faces and edges.
+    QCOMPARE(geometry.shape(), QStringLiteral("Torus"));
+    QCOMPARE(geometry.vertexCount(), 32 * 12);
+    QCOMPARE(geometry.faceCount(), 32 * 12);
+    QCOMPARE(geometry.edgeCount(), 32 * 12 * 2);
+
+    // The outer and inner walls need opposite normals to light correctly.
+    QVERIFY(geometry.faceNormal(0).x() > 0.0f);
+    QVERIFY(geometry.faceNormal(6).x() < 0.0f);
+    for (int face = 0; face < geometry.faceCount(); ++face)
+        QVERIFY(geometry.faceNormal(face).length() > 0.9f);
+
+    const QVariantMap saved = geometry.serializeMesh();
+    EditableGeometry restored;
+    QVERIFY(restored.loadMesh(saved));
+    QCOMPARE(restored.shape(), QStringLiteral("Torus"));
+    QCOMPARE(restored.vertexCount(), geometry.vertexCount());
+    QCOMPARE(restored.faceCount(), geometry.faceCount());
+    QCOMPARE(restored.edgeCount(), geometry.edgeCount());
+}
+
 void EditableGeometryTests::vertexEditsChangeSerializedMesh()
+
 {
     EditableGeometry geometry;
     const QVector3D replacement(-17.0f, 23.0f, 9.5f);

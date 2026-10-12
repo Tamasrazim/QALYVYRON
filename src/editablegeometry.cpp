@@ -19,6 +19,8 @@ constexpr float kPrimitiveRadius = 50.0f;
 constexpr int kCylinderSegments = 32;
 constexpr int kSphereSegments = 32;
 constexpr int kSphereLatitudeBands = 16;
+constexpr int kTorusMajorSegments = 32;
+constexpr int kTorusMinorSegments = 12;
 constexpr float kEpsilon = 1.0e-5f;
 constexpr qint64 kMaximumRenderedVertices = 1000000;
 
@@ -47,7 +49,8 @@ void EditableGeometry::setShape(const QString &shape)
                                 || normalized == QLatin1String("Sphere")
                                 || normalized == QLatin1String("Cylinder")
                                 || normalized == QLatin1String("Cone")
-                                || normalized == QLatin1String("Plane"))
+                                || normalized == QLatin1String("Plane")
+                                || normalized == QLatin1String("Torus"))
         ? normalized : QStringLiteral("Cube");
 
     if (m_shape == supported && !m_vertices.isEmpty())
@@ -958,6 +961,7 @@ bool EditableGeometry::loadMesh(const QVariantMap &data)
          || requestedShape == QLatin1String("Cylinder")
          || requestedShape == QLatin1String("Cone")
          || requestedShape == QLatin1String("Plane")
+         || requestedShape == QLatin1String("Torus")
          || requestedShape == QLatin1String("Custom"))
         ? requestedShape : QStringLiteral("Custom");
 
@@ -1078,6 +1082,48 @@ void EditableGeometry::createPrimitive(const QString &shape)
         for (int i = 0; i < kCylinderSegments; ++i)
             base.prepend(i);
         m_faces.append(base);
+    } else if (shape == QLatin1String("Torus")) {
+        // Build a real ring mesh. The major circle makes the ring; each minor
+        // circle supplies the tube thickness. Shared vertices keep it editable.
+        const float majorRadius = kPrimitiveRadius * 0.68f;
+        const float tubeRadius = kPrimitiveRadius * 0.32f;
+        QVector<QVector<int>> rings;
+        rings.reserve(kTorusMajorSegments);
+
+        for (int major = 0; major < kTorusMajorSegments; ++major) {
+            const float theta = 2.0f * kPi * major / kTorusMajorSegments;
+            const float aroundX = std::cos(theta);
+            const float aroundZ = std::sin(theta);
+            QVector<int> ring;
+            ring.reserve(kTorusMinorSegments);
+
+            for (int minor = 0; minor < kTorusMinorSegments; ++minor) {
+                const float phi = 2.0f * kPi * minor / kTorusMinorSegments;
+                const float tubeOffset = majorRadius + tubeRadius * std::cos(phi);
+                ring.append(m_vertices.size());
+                m_vertices.append(QVector3D(
+                    tubeOffset * aroundX,
+                    tubeRadius * std::sin(phi),
+                    tubeOffset * aroundZ));
+            }
+            rings.append(ring);
+        }
+
+        for (int major = 0; major < kTorusMajorSegments; ++major) {
+            const int nextMajor = (major + 1) % kTorusMajorSegments;
+            const QVector<int> &ring = rings.at(major);
+            const QVector<int> &nextRing = rings.at(nextMajor);
+            for (int minor = 0; minor < kTorusMinorSegments; ++minor) {
+                const int nextMinor = (minor + 1) % kTorusMinorSegments;
+                // This winding points normals outward from the tube, even along the inner wall.
+                m_faces.append(QVector<int>{
+                    ring.at(minor),
+                    ring.at(nextMinor),
+                    nextRing.at(nextMinor),
+                    nextRing.at(minor)
+                });
+            }
+        }
     } else {
         m_vertices = {
             {-kPrimitiveRadius, -kPrimitiveRadius, -kPrimitiveRadius},
@@ -1100,7 +1146,9 @@ void EditableGeometry::createPrimitive(const QString &shape)
     }
 
     m_shape = shape;
-    if (shape != QLatin1String("Plane"))
+    // The torus already has the correct winding. The convex-mesh helper below
+    // would incorrectly flip faces along the inside of the ring.
+    if (shape != QLatin1String("Plane") && shape != QLatin1String("Torus"))
         orientClosedMeshOutward();
     rebuildGeometry();
 }
