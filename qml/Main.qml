@@ -928,10 +928,22 @@ ApplicationWindow {
         }
 
         const selectedEdge = edgeIndexSpinner.value
-        pushUndoSnapshot()
+        // Save a candidate snapshot first, but add it to Undo only if the bevel succeeds.
+        // Trying an unsupported edge should not create a useless history entry.
+        const previousScene = historySnapshot()
         if (!geometry.bevelEdge(selectedEdge, distance)) {
             setStatus("This edge cannot be safely beveled at that width. Try a smaller width on a closed mesh corner.")
             return
+        }
+
+        if (!historyLocked) {
+            const stack = undoStack.slice()
+            stack.push(previousScene)
+            if (stack.length > historyLimit)
+                stack.shift()
+            undoStack = stack
+            redoStack = []
+            projectDirty = true
         }
 
         clearMeshEdgeSelection()
