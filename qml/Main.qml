@@ -54,6 +54,8 @@ ApplicationWindow {
     property bool historyLocked: false
     property bool editorReady: false
     property bool beginnerMode: true
+    // Keep the hierarchy searchable when a scene grows beyond a few objects.
+    property string hierarchyFilter: ""
     property int tutorialStep: 0
     property var meshVertexSelection: []
     property bool vertexSelectionMode: false
@@ -536,6 +538,26 @@ ApplicationWindow {
             candidate = candidate.parent
         }
         return ""
+    }
+
+    function objectMatchesFilter(label, shape, objectId) {
+        const query = hierarchyFilter.trim().toLowerCase()
+        if (query.length === 0)
+            return true
+
+        return String(label).toLowerCase().includes(query)
+            || String(shape).toLowerCase().includes(query)
+            || String(objectId).toLowerCase().includes(query)
+    }
+
+    function visibleHierarchyMatchCount() {
+        let matchCount = 0
+        for (let i = 0; i < objectList.count; ++i) {
+            const row = objectList.get(i)
+            if (objectMatchesFilter(row.label, row.shape, row.objectId))
+                ++matchCount
+        }
+        return matchCount
     }
 
     function selectObject(objectId) {
@@ -2891,10 +2913,21 @@ ApplicationWindow {
                         }
                         Item { Layout.fillWidth: true }
                         Text {
-                            text: String(objectList.count)
+                            text: root.hierarchyFilter.trim().length > 0
+                                  ? root.visibleHierarchyMatchCount() + " / " + objectList.count
+                                  : String(objectList.count)
                             color: root.secondaryText
                             font.pixelSize: 10
                         }
+                    }
+
+                    TextField {
+                        id: hierarchySearchField
+                        Layout.fillWidth: true
+                        placeholderText: "Find by name, shape or ID…"
+                        selectByMouse: true
+                        text: root.hierarchyFilter
+                        onTextChanged: root.hierarchyFilter = text
                     }
 
                     ListView {
@@ -2902,7 +2935,9 @@ ApplicationWindow {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         clip: true
-                        spacing: 4
+                        // Hidden delegates collapse to zero height so the filter
+                        // does not leave empty rows between matching objects.
+                        spacing: 0
                         model: objectList
 
                         delegate: Rectangle {
@@ -2913,8 +2948,9 @@ ApplicationWindow {
                             required property bool isVisible
 
                             width: hierarchyView.width
-                            height: 39
+                            height: root.objectMatchesFilter(label, shape, objectId) ? 39 : 0
                             radius: 3
+                            visible: height > 0
                             opacity: isVisible ? 1.0 : 0.48
                             color: root.selectedIndex === index ? "#292929" : "transparent"
                             border.color: root.selectedIndex === index ? "#666666" : "transparent"
@@ -2972,6 +3008,16 @@ ApplicationWindow {
                             anchors.centerIn: parent
                             visible: objectList.count === 0
                             text: "No objects yet"
+                            color: "#666666"
+                            font.pixelSize: 11
+                        }
+
+                        Text {
+                            anchors.centerIn: parent
+                            visible: objectList.count > 0
+                                     && root.hierarchyFilter.trim().length > 0
+                                     && root.visibleHierarchyMatchCount() === 0
+                            text: "No objects match that search"
                             color: "#666666"
                             font.pixelSize: 11
                         }

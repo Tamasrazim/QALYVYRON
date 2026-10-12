@@ -11,6 +11,7 @@ QALYVYRON is an active mainline desktop application under development. It now ha
 - [x] Establish the C++/Qt 6 application and versioned local scene-file I/O.
 - [x] Add a real-time 3D viewport and common primitives, including an editable torus mesh.
 - [x] Add hierarchy selection, rename, duplicate, delete, numeric transforms, and per-object visibility controls.
+- [x] Add live hierarchy search by object name, shape type, and object ID, with an empty-results message.
 - [x] Add basic primitive material, camera and light controls.
 - [x] Export a PNG of the viewport, labelled as a preview rather than a final render.
 - [x] Add bounded undo/redo checkpoints for common scene edits in the current implementation.
